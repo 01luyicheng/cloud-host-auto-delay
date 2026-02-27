@@ -110,12 +110,21 @@ class CloudHostClient(ABC):
         log_lines.append(f'  账号: {self.username}')
         log_lines.append(f'  方法: {method}')
         log_lines.append(f'  URL: {url}')
+
+        def _mask_sensitive(payload: Dict[str, Any]) -> Dict[str, Any]:
+            sensitive_keys = {'password', 'passwd', 'token', 'secret'}
+            return {
+                key: ('***' if str(key).lower() in sensitive_keys else value)
+                for key, value in payload.items()
+            }
         
         if params:
-            log_lines.append(f'  查询参数: {json.dumps(params, ensure_ascii=False)}')
+            safe_params = _mask_sensitive(params)
+            log_lines.append(f'  查询参数: {json.dumps(safe_params, ensure_ascii=False)}')
         
         if data:
-            log_lines.append(f'  请求数据: {json.dumps(data, ensure_ascii=False)}')
+            safe_data = _mask_sensitive(data)
+            log_lines.append(f'  请求数据: {json.dumps(safe_data, ensure_ascii=False)}')
         
         if response:
             log_lines.append(f'  响应状态码: {response.status_code}')
