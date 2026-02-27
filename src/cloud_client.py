@@ -111,20 +111,49 @@ class CloudHostClient(ABC):
         log_lines.append(f'  方法: {method}')
         log_lines.append(f'  URL: {url}')
 
-        def _mask_sensitive(payload: Dict[str, Any]) -> Dict[str, Any]:
-            sensitive_keys = {'password', 'passwd', 'token', 'secret'}
-            return {
-                key: ('***' if str(key).lower() in sensitive_keys else value)
-                for key, value in payload.items()
+        def _mask_sensitive(payload: Any, seen_ids=None) -> Any:
+            if seen_ids is None:
+                seen_ids = set()
+            sensitive_keys = {
+                'password', 'passwd', 'token', 'secret',
+                'api_key', 'apikey', 'authorization', 'auth',
+                'credential', 'private_key', 'access_token', 'refresh_token',
             }
+
+            if isinstance(payload, dict):
+                payload_id = id(payload)
+                if payload_id in seen_ids:
+                    return '<circular_ref>'
+                seen_ids.add(payload_id)
+                return {
+                    key: (
+                        '***'
+                        if str(key).lower() in sensitive_keys
+                        else _mask_sensitive(value, seen_ids)
+                    )
+                    for key, value in payload.items()
+                }
+            if isinstance(payload, list):
+                payload_id = id(payload)
+                if payload_id in seen_ids:
+                    return '<circular_ref>'
+                seen_ids.add(payload_id)
+                return [_mask_sensitive(item, seen_ids) for item in payload]
+            if isinstance(payload, tuple):
+                payload_id = id(payload)
+                if payload_id in seen_ids:
+                    return '<circular_ref>'
+                seen_ids.add(payload_id)
+                return tuple(_mask_sensitive(item, seen_ids) for item in payload)
+            return payload
         
         if params:
             safe_params = _mask_sensitive(params)
-            log_lines.append(f'  查询参数: {json.dumps(safe_params, ensure_ascii=False)}')
+            log_lines.append(f'  查询参数: {json.dumps(safe_params, ensure_ascii=False, default=str)}')
         
         if data:
             safe_data = _mask_sensitive(data)
-            log_lines.append(f'  请求数据: {json.dumps(safe_data, ensure_ascii=False)}')
+            log_lines.append(f'  请求数据: {json.dumps(safe_data, ensure_ascii=False, default=str)}')
         
         if response:
             log_lines.append(f'  响应状态码: {response.status_code}')
