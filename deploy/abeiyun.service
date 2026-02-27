@@ -1,0 +1,18 @@
+[Unit]
+Description=Cloud Host Auto Delay Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/abeiyun
+Environment="PYTHONUNBUFFERED=1"
+Environment="LANG=en_US.UTF-8"
+ExecStart=/opt/abeiyun/venv/bin/python /opt/abeiyun/main.py
+Restart=always
+RestartSec=10
+StandardOutput=append:/opt/abeiyun/logs/service.log
+StandardError=append:/opt/abeiyun/logs/service.log
+
+[Install]
+WantedBy=multi-user.target

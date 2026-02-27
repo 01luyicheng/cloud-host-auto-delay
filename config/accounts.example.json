@@ -1,0 +1,30 @@
+{
+  "global": {
+    "schedule_hour": 2,
+    "schedule_minute": 0,
+    "first_delay_days": 4,
+    "delay_interval_days": 5
+  },
+  "accounts": [
+    {
+      "username": "手机号1",
+      "password": "密码1",
+      "platform": "abeiyun",
+      "post_url": "https://blog.csdn.net/xxx/article/details/xxx",
+      "screenshot_path": "./abeiyun_screenshot.jpg",
+      "enabled": true,
+      "first_delay_days": 4,
+      "delay_interval_days": 5
+    },
+    {
+      "username": "手机号2",
+      "password": "密码2",
+      "platform": "sanfengyun",
+      "post_url": "https://blog.csdn.net/yyy/article/details/yyy",
+      "screenshot_path": "./sanfengyun_screenshot.jpg",
+      "enabled": true,
+      "first_delay_days": 4,
+      "delay_interval_days": 5
+    }
+  ]
+}

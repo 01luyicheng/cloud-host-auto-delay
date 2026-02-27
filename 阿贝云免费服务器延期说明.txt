@@ -1,0 +1,5 @@
+阿贝云提供免费的服务器，但是需要每隔5天在阿贝云官网上提交一次发帖地址和发帖截图。我们要自动化这个过程，定时执行，但要确保这个定时任务的资源占用不高，尽量不要使用无头浏览器，因为自动延期程序会运行在一台1核1G的低配服务器上。
+可以使用这篇文章：https://blog.csdn.net/2301_76576671/article/details/142024603，对应的截图在项目目录下。
+进行免费延期要先访问https://m.abeiyun.com/#/login，输入用户名和密码，点击登录。登录没有人机验证。可以使用测试账号密码，账号13605720328，密码Luyicheng@0505。移动端网页比桌面端简单很多，所以我们使用移动端网页来分析。
+登录完成后访问https://m.abeiyun.com/#/user/freevpsdelay，在此页面填写发帖地址https://blog.csdn.net/2301_76576671/article/details/142024603并上传发帖截图。
+三丰云也可以参考这个。官网是https://m.sanfengyun.com/，发帖链接是https://blog.csdn.net/2301_76576671/article/details/158207914?fromshare=blogdetail&sharetype=blogdetail&sharerId=158207914&sharerefer=PC&sharesource=2301_76576671&sharefrom=from_link
