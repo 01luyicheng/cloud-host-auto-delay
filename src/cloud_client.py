@@ -73,6 +73,9 @@ class CloudHostClient(ABC):
         self.session.mount("http://", adapter)
         self.session.mount("https://", adapter)
 
+        # 设置默认超时（连接超时5秒，读取超时30秒）
+        self.default_timeout = (5, 30)
+
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/javascript, */*; q=0.01',
@@ -221,7 +224,7 @@ class CloudHostClient(ABC):
                 response = self.session.post(
                     self.LOGIN_URL,
                     data=login_data,
-                    timeout=30,
+                    timeout=self.default_timeout,
                 )
                 response.raise_for_status()
                 
@@ -291,7 +294,7 @@ class CloudHostClient(ABC):
 
             self._wait_for_rate_limit()
 
-            response = self.session.post(self.RENEW_URL, data=params, timeout=30)
+            response = self.session.post(self.RENEW_URL, data=params, timeout=self.default_timeout)
             logger.info(f'响应状态码: {response.status_code}')
             
             success, result, raw_text = self._parse_json_response(response)
@@ -363,7 +366,7 @@ class CloudHostClient(ABC):
                         self.RENEW_URL,
                         data={'cmd': 'free_delay_add', 'ptype': ptype, 'url': post_url},
                         files=files,
-                        timeout=60,
+                        timeout=(10, 60),  # 连接超时10秒，读取超时60秒（文件上传需要更长时间）
                     )
                 
                 response.raise_for_status()

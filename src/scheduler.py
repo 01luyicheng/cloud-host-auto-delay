@@ -530,6 +530,38 @@ class DelayScheduler:
         self.scheduler.shutdown(wait=True)
         logger.info('定时任务调度器已停止')
     
+    def _process_single_account_with_timeout(self, account: AccountConfig, timeout_seconds: int = 120) -> Tuple[bool, str]:
+        """
+        处理单个账号，带超时保护
+        
+        Args:
+            account: 账号配置
+            timeout_seconds: 超时时间（秒）
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        result = {'success': False, 'message': '未知错误'}
+        
+        def target():
+            nonlocal result
+            try:
+                success, message = self._process_single_account(account)
+                result = {'success': success, 'message': message}
+            except Exception as e:
+                result = {'success': False, 'message': f'异常: {str(e)}'}
+        
+        thread = threading.Thread(target=target)
+        thread.daemon = True
+        thread.start()
+        thread.join(timeout=timeout_seconds)
+        
+        if thread.is_alive():
+            logger.error(f'账号 [{account.platform}] {account.username} 处理超时（{timeout_seconds}秒）')
+            return False, f'处理超时（{timeout_seconds}秒）'
+        
+        return result['success'], result['message']
+
     def run_once(self):
         """立即执行一次（用于测试）"""
         logger.info('手动触发延期任务执行')
@@ -545,7 +577,8 @@ class DelayScheduler:
             logger.info(f'处理账号: [{account.platform}] {account.username}')
             
             try:
-                success, message = self._process_single_account(account)
+                # 使用带超时保护的版本
+                success, message = self._process_single_account_with_timeout(account, timeout_seconds=120)
                 
                 account_state_manager.record_delay(
                     platform=account.platform,
