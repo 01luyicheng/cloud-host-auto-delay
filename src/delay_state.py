@@ -103,6 +103,7 @@ class DelayStateManager:
         success: bool,
         message: str,
         verification_delay_hours: int = 5,
+        is_aggressive_mode: bool = False,
     ):
         """
         记录延期提交
@@ -116,6 +117,7 @@ class DelayStateManager:
             success: 是否成功
             message: 返回消息
             verification_delay_hours: 验证延迟小时数
+            is_aggressive_mode: 是否为高频尝试模式
         """
         key = self._get_account_key(platform, username)
         now = datetime.now()
@@ -135,11 +137,13 @@ class DelayStateManager:
                 'verify_attempted': False,
                 'verify_success': None,
                 'verify_message': None,
+                'is_aggressive_mode': is_aggressive_mode,
             }
             self._save_state()
         
         if success:
-            logger.info(f'[{platform}] {username} 延期已提交，将在 {verify_time.strftime("%H:%M")} 验证')
+            mode_str = '高频模式' if is_aggressive_mode else '普通模式'
+            logger.info(f'[{platform}] {username} 延期已提交（{mode_str}），将在 {verify_time.strftime("%H:%M")} 验证')
         else:
             logger.warning(f'[{platform}] {username} 延期提交失败: {message}')
     

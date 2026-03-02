@@ -310,6 +310,9 @@ class DelayScheduler:
                 ptype=account.ptype,
             )
             
+            # 高频模式下使用 aggressive_interval_hours 作为验证延迟
+            verification_delay = account.aggressive_interval_hours if account.enable_aggressive_mode else config.verification_delay_hours
+            
             state_manager.record_submission(
                 platform=account.platform,
                 username=account.username,
@@ -318,7 +321,8 @@ class DelayScheduler:
                 screenshot_path=account.screenshot_path,
                 success=success,
                 message=message,
-                verification_delay_hours=config.verification_delay_hours,
+                verification_delay_hours=verification_delay,
+                is_aggressive_mode=account.enable_aggressive_mode,
             )
             
             return success, message
@@ -447,11 +451,21 @@ class DelayScheduler:
                 )
                 
                 if verify_success:
-                    failed_accounts.append({
-                        'platform': platform,
-                        'username': username,
-                        'message': '上次延期未生效，本次重新提交成功',
-                    })
+                    is_aggressive = state.get('is_aggressive_mode', False)
+                    if is_aggressive:
+                        failed_accounts.append({
+                            'platform': platform,
+                            'username': username,
+                            'message': '【高频模式】上次延期未生效，本次重新提交成功',
+                        })
+                        # 高频模式下验证成功（即上次失败），需要更新下次尝试时间
+                        self._update_aggressive_mode_next_delay(platform, username)
+                    else:
+                        failed_accounts.append({
+                            'platform': platform,
+                            'username': username,
+                            'message': '上次延期未生效，本次重新提交成功',
+                        })
                 
             except Exception as e:
                 logger.error(f'验证账号 {username} 时发生异常: {e}')
@@ -552,6 +566,34 @@ class DelayScheduler:
         }
         
         notifier.send_verification_failed_notification(title, results, summary)
+    
+    def _update_aggressive_mode_next_delay(self, platform: str, username: str):
+        """
+        更新高频模式下的下次尝试时间
+        
+        实现说明:
+        当高频模式下验证发现上次延期失败时，
+        需要立即重置下次尝试时间，让程序尽快再次尝试
+        
+        Args:
+            platform: 平台
+            username: 用户名
+        """
+        # 查找账号配置获取 aggressive_interval_hours
+        aggressive_interval_hours = 6  # 默认值
+        for account in config.accounts:
+            if account.platform == platform and account.username == username:
+                aggressive_interval_hours = account.aggressive_interval_hours
+                break
+        
+        # 使用高频间隔设置下次尝试时间
+        account_state_manager.record_aggressive_mode_delay(
+            platform=platform,
+            username=username,
+            aggressive_interval_hours=aggressive_interval_hours,
+        )
+        
+        logger.info(f'【高频模式】账号 [{platform}] {username} 验证发现上次失败，已重置下次尝试时间')
     
     def start(self):
         """启动调度器"""
