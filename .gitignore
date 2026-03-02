@@ -56,3 +56,12 @@ Thumbs.db
 
 # 临时测试文件（保留test_end_to_end.py）
 test_api_*.py
+
+# 私有部署脚本（包含敏感信息）
+deploy/private-install.sh
+deploy/private-*.sh
+*.private.sh
+
+# 部署压缩包
+deploy-files.tar.gz
+*.deploy.tar.gz
