@@ -117,7 +117,30 @@ python main.py
 
 ## Linux部署
 
-### 使用部署脚本
+### 方式一：一键快速安装（推荐）
+
+在Linux服务器上直接执行以下命令：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/01luyicheng/cloud-host-auto-delay/main/deploy/quick-install.sh | sudo bash
+```
+
+安装完成后，编辑配置文件：
+
+```bash
+# 编辑环境配置
+nano /opt/abeiyun/.env
+
+# 编辑账号配置
+nano /opt/abeiyun/config/accounts.json
+
+# 上传截图文件到 /opt/abeiyun/
+
+# 重启服务
+systemctl restart abeiyun
+```
+
+### 方式二：手动部署
 
 ```bash
 # 上传项目到服务器
