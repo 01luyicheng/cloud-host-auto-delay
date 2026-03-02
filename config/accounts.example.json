@@ -3,7 +3,9 @@
     "schedule_hour": 2,
     "schedule_minute": 0,
     "first_delay_days": 4,
-    "delay_interval_days": 5
+    "delay_interval_days": 5,
+    "enable_aggressive_mode": false,
+    "aggressive_interval_hours": 6
   },
   "accounts": [
     {
@@ -14,7 +16,9 @@
       "screenshot_path": "./abeiyun_screenshot.jpg",
       "enabled": true,
       "first_delay_days": 4,
-      "delay_interval_days": 5
+      "delay_interval_days": 5,
+      "enable_aggressive_mode": false,
+      "aggressive_interval_hours": 6
     },
     {
       "username": "手机号2",
@@ -24,7 +28,9 @@
       "screenshot_path": "./sanfengyun_screenshot.jpg",
       "enabled": true,
       "first_delay_days": 4,
-      "delay_interval_days": 5
+      "delay_interval_days": 5,
+      "enable_aggressive_mode": true,
+      "aggressive_interval_hours": 8
     }
   ]
 }

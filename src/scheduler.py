@@ -142,7 +142,7 @@ class DelayScheduler:
         
         实现说明:
         1. 获取所有启用的账号
-        2. 检查每个账号是否应该执行延期
+        2. 检查每个账号是否应该执行延期（普通模式或高频模式）
         3. 对需要延期的账号执行延期操作
         4. 使用锁确保并发安全
         """
@@ -159,7 +159,11 @@ class DelayScheduler:
             if account_state_manager.is_max_retries_exceeded(account.platform, account.username):
                 continue
             
-            if account_state_manager.should_delay(account.platform, account.username):
+            # 高频尝试模式：直接尝试，不需要检查时间
+            if account.enable_aggressive_mode:
+                accounts_to_delay.append(account)
+                logger.debug(f'账号 [{account.platform}] {account.username} 启用高频尝试模式')
+            elif account_state_manager.should_delay(account.platform, account.username):
                 accounts_to_delay.append(account)
         
         if not accounts_to_delay:
@@ -201,6 +205,18 @@ class DelayScheduler:
         try:
             success, message = self._process_single_account(account)
             
+            # 高频尝试模式：如果失败是因为"还未到时间"，则视为正常情况
+            if not success and account.enable_aggressive_mode:
+                if self._is_not_yet_time_message(message):
+                    logger.info(f'账号 [{account.platform}] {account.username} 还未到可延期时间，高频模式下这是正常的')
+                    # 记录为"伪成功"，使用高频间隔设置下次尝试时间
+                    account_state_manager.record_aggressive_mode_delay(
+                        platform=account.platform,
+                        username=account.username,
+                        aggressive_interval_hours=account.aggressive_interval_hours,
+                    )
+                    return
+            
             account_state_manager.record_delay(
                 platform=account.platform,
                 username=account.username,
@@ -241,6 +257,27 @@ class DelayScheduler:
             
             if consecutive_failures_after >= self.FAILURE_WARNING_THRESHOLD:
                 self._send_consecutive_failure_warning(account, consecutive_failures_after, str(e))
+    
+    def _is_not_yet_time_message(self, message: str) -> bool:
+        """
+        检查错误消息是否表示"还未到可以提交延期的时间"
+        
+        Args:
+            message: 错误消息
+            
+        Returns:
+            是否是"还未到时间"的消息
+        """
+        not_yet_time_keywords = [
+            '还没有到可以提交延期的时间',
+            '还未到',
+            '未到',
+            '时间未到',
+            'not yet',
+            'too early',
+        ]
+        message_lower = message.lower()
+        return any(keyword in message for keyword in not_yet_time_keywords)
     
     def _process_single_account(self, account: AccountConfig) -> Tuple[bool, str]:
         """

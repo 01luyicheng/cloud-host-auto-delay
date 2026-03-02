@@ -189,6 +189,40 @@ class AccountStateManager:
             
             logger.info(f'记录账号状态: [{platform}] {username}, 成功={success}, 连续失败={state.consecutive_failures}, 下次延期={state.next_delay_time}')
     
+    def record_aggressive_mode_delay(
+        self,
+        platform: str,
+        username: str,
+        aggressive_interval_hours: int = 6,
+    ):
+        """
+        记录高频尝试模式下的延期状态
+        
+        实现说明:
+        1. 当高频模式下尝试延期但"还未到时间"时调用
+        2. 不增加失败计数，使用高频间隔设置下次尝试时间
+        3. 重置连续失败计数（因为这是预期内的"失败"）
+        
+        Args:
+            platform: 平台
+            username: 用户名
+            aggressive_interval_hours: 高频尝试间隔小时数
+        """
+        with self._file_lock:
+            key = self._get_state_key(platform, username)
+            state = self.get_state(platform, username)
+            
+            state.last_delay_time = datetime.now()
+            state.last_success = True  # 在高频模式下，"还未到时间"视为正常情况
+            state.last_message = '高频模式：还未到可延期时间，等待下次尝试'
+            state.consecutive_failures = 0  # 重置失败计数
+            state.next_delay_time = datetime.now() + timedelta(hours=aggressive_interval_hours)
+            
+            self._states[key] = state
+            self._save_states()
+            
+            logger.info(f'记录高频模式状态: [{platform}] {username}, 下次尝试={state.next_delay_time}')
+    
     def set_initial_next_delay_time(
         self,
         platform: str,

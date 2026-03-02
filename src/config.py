@@ -43,6 +43,10 @@ class AccountConfig:
         
         self.first_delay_days: int = data.get('first_delay_days', 0)
         self.delay_interval_days: int = data.get('delay_interval_days', 5)
+        
+        # 高频尝试模式配置
+        self.enable_aggressive_mode: bool = data.get('enable_aggressive_mode', False)
+        self.aggressive_interval_hours: int = data.get('aggressive_interval_hours', 6)
     
     def validate(self) -> Tuple[bool, str]:
         """验证账号配置是否完整"""
@@ -64,6 +68,8 @@ class AccountConfig:
             return False, '首次延期天数不能为负数'
         if self.delay_interval_days < 1:
             return False, '延期间隔天数必须大于0'
+        if self.aggressive_interval_hours < 1:
+            return False, '高频尝试间隔小时数必须大于0'
         return True, ''
 
 
@@ -149,15 +155,17 @@ class Config:
             accounts = []
             for account_data in data.get('accounts', []):
                 merged_data = {
-                    'platform': account_data.get('platform') or global_config.get('platform', 'abeiyun'),
-                    'post_url': account_data.get('post_url') or global_config.get('post_url', ''),
-                    'screenshot_path': account_data.get('screenshot_path') or global_config.get('screenshot_path', ''),
-                    'schedule_hour': account_data.get('schedule_hour', global_config.get('schedule_hour', 2)),
-                    'schedule_minute': account_data.get('schedule_minute', global_config.get('schedule_minute', 0)),
-                    'ptype': account_data.get('ptype', global_config.get('ptype', 'vps')),
-                    'first_delay_days': account_data.get('first_delay_days', global_config.get('first_delay_days', 0)),
-                    'delay_interval_days': account_data.get('delay_interval_days', global_config.get('delay_interval_days', 5)),
-                }
+                'platform': account_data.get('platform') or global_config.get('platform', 'abeiyun'),
+                'post_url': account_data.get('post_url') or global_config.get('post_url', ''),
+                'screenshot_path': account_data.get('screenshot_path') or global_config.get('screenshot_path', ''),
+                'schedule_hour': account_data.get('schedule_hour', global_config.get('schedule_hour', 2)),
+                'schedule_minute': account_data.get('schedule_minute', global_config.get('schedule_minute', 0)),
+                'ptype': account_data.get('ptype', global_config.get('ptype', 'vps')),
+                'first_delay_days': account_data.get('first_delay_days', global_config.get('first_delay_days', 0)),
+                'delay_interval_days': account_data.get('delay_interval_days', global_config.get('delay_interval_days', 5)),
+                'enable_aggressive_mode': account_data.get('enable_aggressive_mode', global_config.get('enable_aggressive_mode', False)),
+                'aggressive_interval_hours': account_data.get('aggressive_interval_hours', global_config.get('aggressive_interval_hours', 6)),
+            }
                 merged_data.update(account_data)
                 
                 screenshot_path = merged_data.get('screenshot_path', '')
