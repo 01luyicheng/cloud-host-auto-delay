@@ -166,7 +166,10 @@ class AccountStateManager:
         """
         with self._file_lock:
             key = self._get_state_key(platform, username)
-            state = self.get_state(platform, username)
+            # 直接访问 _states，避免递归获取锁
+            if key not in self._states:
+                self._states[key] = AccountDelayState()
+            state = self._states[key]
             
             state.last_delay_time = datetime.now()
             state.last_success = success
@@ -184,7 +187,6 @@ class AccountStateManager:
                 if state.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES:
                     logger.error(f'账号 [{platform}] {username} 连续失败 {state.consecutive_failures} 次，已达到最大重试次数')
             
-            self._states[key] = state
             self._save_states()
             
             logger.info(f'记录账号状态: [{platform}] {username}, 成功={success}, 连续失败={state.consecutive_failures}, 下次延期={state.next_delay_time}')
@@ -210,7 +212,10 @@ class AccountStateManager:
         """
         with self._file_lock:
             key = self._get_state_key(platform, username)
-            state = self.get_state(platform, username)
+            # 直接访问 _states，避免递归获取锁
+            if key not in self._states:
+                self._states[key] = AccountDelayState()
+            state = self._states[key]
             
             state.last_delay_time = datetime.now()
             state.last_success = True  # 在高频模式下，"还未到时间"视为正常情况
@@ -218,7 +223,6 @@ class AccountStateManager:
             state.consecutive_failures = 0  # 重置失败计数
             state.next_delay_time = datetime.now() + timedelta(hours=aggressive_interval_hours)
             
-            self._states[key] = state
             self._save_states()
             
             logger.info(f'记录高频模式状态: [{platform}] {username}, 下次尝试={state.next_delay_time}')
@@ -239,11 +243,13 @@ class AccountStateManager:
         """
         with self._file_lock:
             key = self._get_state_key(platform, username)
-            state = self.get_state(platform, username)
+            # 直接访问 _states，避免递归获取锁
+            if key not in self._states:
+                self._states[key] = AccountDelayState()
+            state = self._states[key]
             
             if state.next_delay_time is None:
                 state.next_delay_time = datetime.now() + timedelta(days=first_delay_days)
-                self._states[key] = state
                 self._save_states()
                 logger.info(f'设置初始延期时间: [{platform}] {username}, 首次延期={first_delay_days}天后')
     

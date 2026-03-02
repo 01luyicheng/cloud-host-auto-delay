@@ -281,12 +281,9 @@ def main():
     logger.info('程序正在运行，按 Ctrl+C 停止')
     
     try:
-        if IS_WINDOWS:
-            while True:
-                time.sleep(1)
-        else:
-            while True:
-                signal.pause()
+        # 主循环，使用较短的睡眠时间以便及时响应信号
+        while True:
+            time.sleep(0.5)
     except (KeyboardInterrupt, SystemExit):
         scheduler.stop()
         logger.info('程序已停止')

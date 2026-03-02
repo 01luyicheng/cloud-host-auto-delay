@@ -30,6 +30,7 @@
 import time
 import json
 import re
+import socket
 import requests
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -38,6 +39,10 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from src.logger import logger, log_account_operation
+
+# 设置全局socket超时
+default_socket_timeout = 35  # 比requests超时稍长
+socket.setdefaulttimeout(default_socket_timeout)
 
 
 class CloudHostClient(ABC):
