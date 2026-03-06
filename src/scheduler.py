@@ -188,13 +188,18 @@ class DelayScheduler:
                         accounts_to_delay.append(account)
                         logger.debug(f'账号 [{account.platform}] {account.username} 基于学习时间需要延期')
                 else:
-                    # 未开始且未学习，启动学习模式
-                    account_state_manager.start_learning_mode(
-                        platform=account.platform,
-                        username=account.username,
-                        learning_interval_hours=account.learning_interval_hours,
-                    )
-                    accounts_to_delay.append(account)
+                    # 未开始且未学习，检查是否已放弃学习
+                    state = account_state_manager.get_state(account.platform, account.username)
+                    if not state.learning_abandoned:
+                        # 未放弃，启动学习模式
+                        account_state_manager.start_learning_mode(
+                            platform=account.platform,
+                            username=account.username,
+                            learning_interval_hours=account.learning_interval_hours,
+                        )
+                        accounts_to_delay.append(account)
+                    else:
+                        logger.debug(f'账号 [{account.platform}] {account.username} 学习已放弃，使用普通模式')
             # 高频尝试模式：直接尝试，不需要检查时间
             elif account.enable_aggressive_mode:
                 accounts_to_delay.append(account)
@@ -250,7 +255,7 @@ class DelayScheduler:
                         account_state_manager.record_verification_result(
                             platform=account.platform,
                             username=account.username,
-                            can_submit=True,
+                            learned_time_is_correct=True,
                             message=message,
                             delay_interval_days=account.delay_interval_days,
                         )
@@ -260,7 +265,7 @@ class DelayScheduler:
                         need_relearn = account_state_manager.record_verification_result(
                             platform=account.platform,
                             username=account.username,
-                            can_submit=False,
+                            learned_time_is_correct=False,
                             message=message,
                             delay_interval_days=account.delay_interval_days,
                         )
@@ -337,17 +342,19 @@ class DelayScheduler:
         except Exception as e:
             logger.error(f'处理账号 {account.username} 时发生异常: {e}')
             
-            # 学习模式下异常不视为失败，继续学习
+            # 学习模式下异常使用专门的异常计数机制
             if account.enable_smart_learning and account_state_manager.is_in_learning_mode(account.platform, account.username):
                 logger.info(f'【学习模式】账号 [{account.platform}] {account.username} 学习过程中发生异常，将继续尝试')
-                account_state_manager.record_learning_attempt(
+                need_notify = account_state_manager.record_learning_exception(
                     platform=account.platform,
                     username=account.username,
-                    success=False,
-                    message=f'异常: {str(e)}',
+                    exception_message=str(e),
                     learning_interval_hours=account.learning_interval_hours,
                     delay_interval_days=account.delay_interval_days,
                 )
+                if need_notify:
+                    # 发送学习异常通知
+                    self._send_learning_exception_notification(account, str(e))
                 return
             
             account_state_manager.record_delay(
@@ -482,6 +489,36 @@ class DelayScheduler:
             'total': 1,
             'success': 1,
             'fail': 0,
+        }
+        
+        notifier.send_notification(title, results, summary)
+    
+    def _send_learning_exception_notification(self, account: AccountConfig, exception_message: str):
+        """
+        发送学习异常通知
+        
+        实现说明:
+        当学习模式连续异常达到阈值时发送通知
+        """
+        state = account_state_manager.get_state(account.platform, account.username)
+        
+        logger.error(f'【学习模式】账号 [{account.platform}] {account.username} 学习连续异常 {state.learning_exception_count} 次')
+        
+        notifier = create_notifier_from_config()
+        
+        title = f'【学习模式】异常告警 ({state.learning_exception_count}次)'
+        
+        results = [{
+            'username': account.username,
+            'platform': account.platform,
+            'success': False,
+            'message': f'学习过程中连续异常 {state.learning_exception_count} 次: {exception_message}',
+        }]
+        
+        summary = {
+            'total': 1,
+            'success': 0,
+            'fail': 1,
         }
         
         notifier.send_notification(title, results, summary)

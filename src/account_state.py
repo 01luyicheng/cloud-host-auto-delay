@@ -78,6 +78,8 @@ class AccountDelayState:
             except (ValueError, TypeError):
                 self.verification_time = None
         self.verified: bool = data.get('verified', False)  # 是否已验证成功
+        self.learning_abandoned: bool = data.get('learning_abandoned', False)  # 学习是否已放弃（超时）
+        self.learning_exception_count: int = data.get('learning_exception_count', 0)  # 学习模式异常计数
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -93,6 +95,8 @@ class AccountDelayState:
             'learning_start_time': self.learning_start_time.isoformat() if self.learning_start_time else None,
             'verification_time': self.verification_time.isoformat() if self.verification_time else None,
             'verified': self.verified,
+            'learning_abandoned': self.learning_abandoned,
+            'learning_exception_count': self.learning_exception_count,
         }
 
 
@@ -104,6 +108,8 @@ class AccountStateManager:
     
     MAX_CONSECUTIVE_FAILURES = 10
     LEARNING_TIMEOUT_DAYS = 7
+    VERIFICATION_INTERVAL_DAYS = 5  # 验证间隔：学习完成后5天验证
+    LEARNING_EXCEPTION_THRESHOLD = 5  # 学习模式异常阈值：连续异常5次发送通知
     
     def __new__(cls):
         if cls._instance is None:
@@ -305,6 +311,11 @@ class AccountStateManager:
         with self._file_lock:
             state = self._get_or_create_state(platform, username)
             
+            # 如果学习已放弃，不再重新启动学习模式
+            if state.learning_abandoned:
+                logger.warning(f'【学习模式】跳过: [{platform}] {username} 学习已超时放弃，不再重新启动')
+                return False
+            
             # 如果已经在学习中或已学习，不重复启动
             if state.learning_status == LearningModeStatus.LEARNING:
                 return False
@@ -365,6 +376,7 @@ class AccountStateManager:
                 if learning_duration.total_seconds() >= self.LEARNING_TIMEOUT_DAYS * 24 * 3600:
                     logger.warning(f'【学习模式】超时: [{platform}] {username} 学习超过{self.LEARNING_TIMEOUT_DAYS}天仍未找到最佳时间，放弃学习')
                     state.learning_status = LearningModeStatus.NOT_STARTED
+                    state.learning_abandoned = True  # 标记学习已放弃，防止无限循环
                     state.next_delay_time = now + timedelta(days=delay_interval_days)  # 使用默认配置
                     self._save_states()
                     return False
@@ -376,15 +388,16 @@ class AccountStateManager:
                 state.last_success = True
                 state.delay_count += 1
                 state.consecutive_failures = 0
+                state.learning_exception_count = 0  # 重置异常计数
                 # 设置下次延期时间
                 state.next_delay_time = now + timedelta(days=delay_interval_days)
-                # 设置验证时间（5 天后）
-                state.verification_time = now + timedelta(days=delay_interval_days)
+                # 设置验证时间（固定5天后验证，独立于延期间隔）
+                state.verification_time = now + timedelta(days=self.VERIFICATION_INTERVAL_DAYS)
                 state.verified = False  # 标记需要验证
                 
                 self._save_states()
                 
-                logger.info(f'【学习模式】完成：[{platform}] {username} 找到最佳提交时间：{now.strftime("%Y-%m-%d %H:%M")}，将在 5 天后验证')
+                logger.info(f'【学习模式】完成：[{platform}] {username} 找到最佳提交时间：{now.strftime("%Y-%m-%d %H:%M")}，将在 {self.VERIFICATION_INTERVAL_DAYS} 天后验证')
                 return True
             else:
                 # 还未到时间，继续学习
@@ -416,7 +429,7 @@ class AccountStateManager:
         self,
         platform: str,
         username: str,
-        can_submit: bool,
+        learned_time_is_correct: bool,
         message: str,
         delay_interval_days: int = 5,
     ) -> bool:
@@ -426,7 +439,7 @@ class AccountStateManager:
         Args:
             platform: 平台
             username: 用户名
-            can_submit: 是否可以提交（True=可以提交=上次学习成功，False=还不能提交=上次学习失败）
+            learned_time_is_correct: 学习到的时间点是否正确（True=可以提交=验证成功，False=还不能提交=验证失败）
             message: 结果消息
             delay_interval_days: 延期间隔天数
             
@@ -442,15 +455,19 @@ class AccountStateManager:
             now = datetime.now()
             state.verified = True
             
-            if can_submit:
+            if learned_time_is_correct:
                 # 验证成功：上次学习的时间点正确
                 logger.info(f'【学习验证】成功：[{platform}] {username} 上次学习的时间点正确')
                 return False
             else:
                 # 验证失败：上次学习的时间点不准确，需要重新学习
                 logger.warning(f'【学习验证】失败：[{platform}] {username} 还不能提交延期，需要重新学习')
+                # 完整重置所有学习相关字段
                 state.learning_status = LearningModeStatus.LEARNING
                 state.learning_start_time = now
+                state.learned_delay_time = None  # 重置学习到的时间
+                state.verification_time = None  # 重置验证时间
+                state.verified = False  # 重置验证标志
                 state.next_delay_time = now  # 立即开始重新学习
                 return True
     
@@ -476,6 +493,7 @@ class AccountStateManager:
         实现说明:
         1. 如果已完成学习，根据学习到的最佳时间 + 固定周期计算
         2. 保持每天的时间点一致（例如每天14:30）
+        3. 确保返回的时间是未来时间（处理程序停机时间较长的情况）
         
         Args:
             platform: 平台
@@ -500,6 +518,13 @@ class AccountStateManager:
         
         # 下次延期时间 = 学习时间 + (周期数+1) * 间隔
         next_delay = learned_time + timedelta(days=(cycles_passed + 1) * delay_interval_days)
+        
+        # 确保返回的是未来时间
+        # 如果计算出的时间已经过期（例如程序停机时间较长），则增加周期直到得到未来时间
+        while next_delay <= now:
+            cycles_passed += 1
+            next_delay = learned_time + timedelta(days=(cycles_passed + 1) * delay_interval_days)
+            logger.warning(f'【学习模式】调整: [{platform}] {username} 计算的下次延期时间已过期，调整为 {next_delay}')
         
         return next_delay
     
@@ -557,6 +582,58 @@ class AccountStateManager:
         """检查是否已超过最大重试次数"""
         state = self.get_state(platform, username)
         return state.consecutive_failures >= self.MAX_CONSECUTIVE_FAILURES
+    
+    def record_learning_exception(
+        self,
+        platform: str,
+        username: str,
+        exception_message: str,
+        learning_interval_hours: int = 2,
+        delay_interval_days: int = 5,
+    ) -> bool:
+        """
+        记录学习模式的异常
+        
+        实现说明:
+        1. 增加异常计数
+        2. 如果连续异常达到阈值，返回True表示需要发送通知
+        3. 设置下次尝试时间
+        
+        Args:
+            platform: 平台
+            username: 用户名
+            exception_message: 异常消息
+            learning_interval_hours: 学习间隔小时数
+            delay_interval_days: 延期间隔天数
+            
+        Returns:
+            是否需要发送异常通知
+        """
+        with self._file_lock:
+            state = self._get_or_create_state(platform, username)
+            
+            # 增加异常计数
+            state.learning_exception_count += 1
+            state.last_delay_time = datetime.now()
+            state.last_message = f'学习异常: {exception_message}'
+            state.next_delay_time = datetime.now() + timedelta(hours=learning_interval_hours)
+            
+            self._save_states()
+            
+            # 检查是否达到阈值
+            need_notify = state.learning_exception_count >= self.LEARNING_EXCEPTION_THRESHOLD
+            
+            if need_notify:
+                logger.error(f'【学习模式】异常告警: [{platform}] {username} 学习过程中连续异常 {state.learning_exception_count} 次')
+            
+            return need_notify
+    
+    def reset_learning_exception_count(self, platform: str, username: str):
+        """重置学习模式异常计数"""
+        with self._file_lock:
+            state = self._get_or_create_state(platform, username)
+            state.learning_exception_count = 0
+            self._save_states()
     
     def get_all_pending_accounts(self) -> List[Dict[str, Any]]:
         """
