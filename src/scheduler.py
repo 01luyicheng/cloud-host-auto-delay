@@ -171,7 +171,11 @@ class DelayScheduler:
             
             # 智能学习模式：高频尝试直到找到最佳时间
             if account.enable_smart_learning:
-                if account_state_manager.is_in_learning_mode(account.platform, account.username):
+                # 检查是否需要验证
+                if account_state_manager.needs_verification(account.platform, account.username):
+                    accounts_to_delay.append(account)
+                    logger.debug(f'账号 [{account.platform}] {account.username} 需要验证学习时间')
+                elif account_state_manager.is_in_learning_mode(account.platform, account.username):
                     if account_state_manager.should_delay(account.platform, account.username):
                         accounts_to_delay.append(account)
                         logger.debug(f'账号 [{account.platform}] {account.username} 处于学习模式')
@@ -239,8 +243,32 @@ class DelayScheduler:
             
             # 智能学习模式处理
             if account.enable_smart_learning:
-                if account_state_manager.is_in_learning_mode(account.platform, account.username):
-                    # 学习中：记录学习结果
+                # 验证模式：检查上次学习是否准确
+                if account_state_manager.needs_verification(account.platform, account.username):
+                    if success:
+                        # 可以提交，说明上次学习成功
+                        account_state_manager.record_verification_result(
+                            platform=account.platform,
+                            username=account.username,
+                            can_submit=True,
+                            message=message,
+                            delay_interval_days=account.delay_interval_days,
+                        )
+                        logger.info(f'【学习验证】账号 [{account.platform}] {account.username} 验证成功，学习时间准确')
+                    else:
+                        # 还不能提交，说明上次学习失败，需要重新学习
+                        need_relearn = account_state_manager.record_verification_result(
+                            platform=account.platform,
+                            username=account.username,
+                            can_submit=False,
+                            message=message,
+                            delay_interval_days=account.delay_interval_days,
+                        )
+                        if need_relearn:
+                            logger.warning(f'【学习验证】账号 [{account.platform}] {account.username} 验证失败，将重新学习')
+                    return
+                # 学习中：记录学习结果
+                elif account_state_manager.is_in_learning_mode(account.platform, account.username):
                     learned = account_state_manager.record_learning_attempt(
                         platform=account.platform,
                         username=account.username,

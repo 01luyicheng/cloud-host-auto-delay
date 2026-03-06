@@ -30,6 +30,7 @@ class LearningModeStatus:
     NOT_STARTED = 'not_started'    # 未开始（首次运行）
     LEARNING = 'learning'          # 学习中（高频尝试找时间点）
     LEARNED = 'learned'            # 已学习（找到规律，进入固定周期）
+    VERIFYING = 'verifying'        # 验证中（5 天后验证是否真的找到了正确时间）
 
 
 class AccountDelayState:
@@ -70,6 +71,13 @@ class AccountDelayState:
                 self.learning_start_time = datetime.fromisoformat(data['learning_start_time'])
             except (ValueError, TypeError):
                 self.learning_start_time = None
+        self.verification_time: Optional[datetime] = None  # 验证时间（5 天后）
+        if data.get('verification_time'):
+            try:
+                self.verification_time = datetime.fromisoformat(data['verification_time'])
+            except (ValueError, TypeError):
+                self.verification_time = None
+        self.verified: bool = data.get('verified', False)  # 是否已验证成功
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -83,6 +91,8 @@ class AccountDelayState:
             'learning_status': self.learning_status,
             'learned_delay_time': self.learned_delay_time.isoformat() if self.learned_delay_time else None,
             'learning_start_time': self.learning_start_time.isoformat() if self.learning_start_time else None,
+            'verification_time': self.verification_time.isoformat() if self.verification_time else None,
+            'verified': self.verified,
         }
 
 
@@ -368,10 +378,13 @@ class AccountStateManager:
                 state.consecutive_failures = 0
                 # 设置下次延期时间
                 state.next_delay_time = now + timedelta(days=delay_interval_days)
+                # 设置验证时间（5 天后）
+                state.verification_time = now + timedelta(days=delay_interval_days)
+                state.verified = False  # 标记需要验证
                 
                 self._save_states()
                 
-                logger.info(f'【学习模式】完成: [{platform}] {username} 找到最佳提交时间: {now.strftime("%Y-%m-%d %H:%M")}')
+                logger.info(f'【学习模式】完成：[{platform}] {username} 找到最佳提交时间：{now.strftime("%Y-%m-%d %H:%M")}，将在 5 天后验证')
                 return True
             else:
                 # 还未到时间，继续学习
@@ -383,15 +396,68 @@ class AccountStateManager:
                 logger.info(f'【学习模式】继续：[{platform}] {username} 还未到时间，下次尝试={state.next_delay_time}')
                 return False
     
-    def is_in_learning_mode(self, platform: str, username: str) -> bool:
-        """检查账号是否处于学习模式"""
-        state = self.get_state(platform, username)
-        return state.learning_status == LearningModeStatus.LEARNING
-    
     def has_learned(self, platform: str, username: str) -> bool:
         """检查账号是否已完成学习"""
         state = self.get_state(platform, username)
         return state.learning_status == LearningModeStatus.LEARNED
+    
+    def needs_verification(self, platform: str, username: str) -> bool:
+        """检查是否需要验证"""
+        state = self.get_state(platform, username)
+        if state.learning_status != LearningModeStatus.LEARNED:
+            return False
+        if state.verified:
+            return False
+        if not state.verification_time:
+            return False
+        return datetime.now() >= state.verification_time
+    
+    def record_verification_result(
+        self,
+        platform: str,
+        username: str,
+        can_submit: bool,
+        message: str,
+        delay_interval_days: int = 5,
+    ) -> bool:
+        """
+        记录验证结果
+        
+        Args:
+            platform: 平台
+            username: 用户名
+            can_submit: 是否可以提交（True=可以提交=上次学习成功，False=还不能提交=上次学习失败）
+            message: 结果消息
+            delay_interval_days: 延期间隔天数
+            
+        Returns:
+            是否需要重新学习
+        """
+        with self._file_lock:
+            state = self._get_or_create_state(platform, username)
+            
+            if state.learning_status != LearningModeStatus.LEARNED:
+                return False
+            
+            now = datetime.now()
+            state.verified = True
+            
+            if can_submit:
+                # 验证成功：上次学习的时间点正确
+                logger.info(f'【学习验证】成功：[{platform}] {username} 上次学习的时间点正确')
+                return False
+            else:
+                # 验证失败：上次学习的时间点不准确，需要重新学习
+                logger.warning(f'【学习验证】失败：[{platform}] {username} 还不能提交延期，需要重新学习')
+                state.learning_status = LearningModeStatus.LEARNING
+                state.learning_start_time = now
+                state.next_delay_time = now  # 立即开始重新学习
+                return True
+    
+    def is_in_learning_mode(self, platform: str, username: str) -> bool:
+        """检查账号是否处于学习模式"""
+        state = self.get_state(platform, username)
+        return state.learning_status == LearningModeStatus.LEARNING
     
     def get_learned_time(self, platform: str, username: str) -> Optional[datetime]:
         """获取学习到的最佳提交时间"""
