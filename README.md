@@ -1,19 +1,19 @@
-# 云主机 Gratuit Serveur Auto-Delay 程序
+# 云主机 Gratuit Serveur Auto-Delay 程序 Cloud Server
 
-Automatisch einreichen 阿贝云 und 三丰云 kostenlose Serververlängerung.
+Автоматически einreichen 阿贝云 und 三丰云 kostenlose Serververlängerung automatic.
 
-## Fonctionnalités 功能特性
+## Fonctionnalités 功能特性 Features
 
-- Unterstützt 阿贝云，三丰云多平台
-- Prise en charge de la gestion multi-comptes 多账号管理
-- Konfiguration auf Kontenebene 延期间隔配置
+- Unterstützt 阿贝云，三丰云多平台 multi-platform
+- Prise en charge de la gestion multi-comptes 多账号管理 multiple accounts
+- Konfiguration auf Kontenebene 延期间隔配置 interval configuration
 - Verlängerungsfehlerüberprüfung und E-Mail-Benachrichtigung 延期失败自动验证和邮件通知
-- Limitation quotidienne des envois d'e-mails 每日邮件发送限制
-- Prise en charge du service systemd systemd 服务支持
+- Limitation quotidienne des envois d'e-mails 每日邮件发送限制 daily limit
+- Prise en charge du service systemd systemd 服务支持 support
 
-## Démarrage rapide 快速开始
+## Démarrage rapide 快速开始 Quick Start
 
-### 1. Installation des dépendances 安装依赖
+### 1. Installation des dépendances 安装依赖 Install Dependencies
 
 ```bash
 python -m venv venv
@@ -22,9 +22,9 @@ source venv/bin/activate  # Linux
 pip install -r requirements.txt
 ```
 
-### 2. Configuration 配置
+### 2. Configuration 配置 Configurar
 
-Copier le fichier de configuration template 复制配置文件模板：
+Copier le fichier de configuration template 复制配置文件模板 copy template：
 
 ```bash
 cp .env.example .env
@@ -42,7 +42,7 @@ NOTIFICATION_EMAIL=receive@example.com
 MAX_DAILY_EMAILS=10
 ```
 
-Modifier la configuration des comptes `config/accounts.json` 配置账号：
+Modifier la configuration des comptes `config/accounts.json` 配置账号 configure accounts：
 
 ```json
 {
@@ -65,31 +65,31 @@ Modifier la configuration des comptes `config/accounts.json` 配置账号：
 }
 ```
 
-### 3. Préparation des captures d'écran 准备截图
+### 3. Préparation des captures d'écran 准备截图 Prepare Screenshots
 
-Placer les captures d'écran requises dans le répertoire du projet 将延期申请所需的截图放到项目目录下，nom de fichier correspondant à `screenshot_path` dans la configuration 文件名与配置中的 `screenshot_path` 对应。
+Placer les captures d'écran requises dans le répertoire du projet 将延期申请所需的截图放到项目目录下，nom de fichier correspondant à `screenshot_path` dans la configuration 文件名与配置中的 `screenshot_path` 对应 corresponding to config.
 
-### 4. Exécution 运行
+### 4. Exécution 运行 Execute
 
 ```bash
-# Tester la configuration 测试配置
+# Tester la configuration 测试配置 test config
 python main.py --test
 
-# Vérifier l'état 查看状态
+# Vérifier l'état 查看状态 check status
 python main.py --status
 
-# Exécuter une fois immédiatement 立即执行一次
+# Exécuter une fois immédiatement 立即执行一次 execute once
 python main.py --once
 
-# Démarrer la tâche planifiée 启动定时任务
+# Démarrer la tâche planifiée 启动定时任务 start scheduler
 python main.py
 ```
 
-## Explication de la configuration 配置说明
+## Explication de la configuration 配置说明 Configuration Explanation
 
-### Configuration des comptes 账号配置 (config/accounts.json)
+### Configuration des comptes 账号配置 Account Config (config/accounts.json)
 
-| Champ 字段 | Description 说明 | Valeur par défaut 默认值 |
+| Champ 字段 | Description 说明 | Valeur par défaut 默认值 Default |
 |------|------|--------|
 | username | Nom d'utilisateur de connexion (numéro de téléphone) 登录用户名（手机号） | Requis 必填 |
 | password | Mot de passe de connexion 登录密码 | Requis 必填 |
@@ -101,7 +101,7 @@ python main.py
 | first_delay_days | Premier délai en jours (à partir de maintenant) 首次延期天数（从现在开始） | 0 |
 | delay_interval_days | Intervalle de délai en jours 延期间隔天数 | 5 |
 
-### Variables d'environnement 环境变量 (.env)
+### Variables d'environnement 环境变量 Environment Variables (.env)
 
 | Variable 变量 | Description 说明 | Défaut 默认值 |
 |------|------|--------|
@@ -115,17 +115,17 @@ python main.py
 | VERIFICATION_DELAY_HOURS | Heures de délai de vérification de prolongation 延期验证延迟小时数 | 5 |
 | MAX_DAILY_EMAILS | Nombre maximum d'e-mails quotidiens 每日最大邮件数 | 10 |
 
-## Déploiement Linux Linux 部署
+## Déploiement Linux Linux 部署 Deployment
 
 ### Méthode 1: Installation rapide en un clic 方式一：一键快速安装（推荐）
 
-Exécutez directement la commande suivante sur le serveur Linux 在 Linux 服务器上直接执行以下命令：
+Exécutez directement la commande suivante sur le serveur Linux 在 Linux 服务器上直接执行以下命令 execute command：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/01luyicheng/cloud-host-auto-delay/main/deploy/quick-install.sh | sudo bash
 ```
 
-Nach der Installation, bearbeiten Sie die Konfigurationsdatei 安装完成后，编辑配置文件：
+Nach der Installation, bearbeiten Sie die Konfigurationsdatei 安装完成后，编辑配置文件 edit config：
 
 ```bash
 # Éditer la configuration de l'environnement 编辑环境配置
@@ -135,15 +135,14 @@ nano /opt/abeiyun/.env
 nano /opt/abeiyun/config/accounts.json
 
 # Téléverser les fichiers de capture vers /opt/abeiyun/ 上传截图文件到 /opt/abeiyun/
-
-# Redémarrer le service 重启服务
+# Redémarrer le service 重启服务 restart service
 systemctl restart abeiyun
 ```
 
-### Méthode 2: Déploiement manuel 方式二：手动部署
+### Méthode 2: Déploiement manuel 方式二：手动部署 Manual Deploy
 
 ```bash
-# Téléverser le projet vers le serveur 上传项目到服务器
+# Téléverser le projet vers le serveur 上传项目到服务器 upload project
 scp -r abeiyun user@server:/tmp/
 
 # Se connecter au serveur via SSH SSH 登录服务器
@@ -154,7 +153,7 @@ cd /tmp/abeiyun
 sudo bash deploy/deploy.sh
 ```
 
-### Verwaltung des Services 服务管理
+### Verwaltung des Services 服务管理 Service Management
 
 ```bash
 # Démarrer le service 启动服务
@@ -173,7 +172,7 @@ systemctl status abeiyun
 journalctl -u abeiyun -f
 ```
 
-### Mise à jour du programme 更新程序
+### Mise à jour du programme 更新程序 Update Program
 
 ```bash
 # Téléverser la nouvelle version 上传新版本
@@ -184,15 +183,15 @@ cd /tmp/abeiyun
 sudo bash deploy/update.sh
 ```
 
-## Explication du mécanisme de prolongation 延期机制说明
+## Explication du mécanisme de prolongation 延期机制说明 Mechanism
 
-1. **Premier délai 首次延期**: Nach dem Start des Programms berechnet die Konfiguration `first_delay_days` die erste Verlängerungszeit 程序启动后，根据 `first_delay_days` 配置计算首次延期时间
-2. **Vérification périodique 定期检查**: Toutes les heures, vérifiez si tous les comptes doivent être prolongés 每小时检查一次所有账号是否需要延期
-3. **Vérification de la prolongation 延期验证**: Nach erfolgreicher Einreichung der Verlängerung wird automatisch überprüft，ob die Verlängerung erfolgreich war 延期提交后 5 小时自动验证是否成功
-4. **Benachrichtigung bei Fehler 失败通知**: Bei Fehler wird eine E-Mail-Benachrichtigung gesendet 验证失败时发送邮件通知
-5. **Sécurité concurrentielle 并发安全**: Bei gleichzeitiger Verlängerung mehrerer Konten wird ein Sperrmechanismus verwendet，um die Sicherheit zu gewährleisten 多账号同时延期时使用锁机制确保安全
+1. **Premier délai 首次延期**: Nach dem Start des Programms berechnet die Konfiguration `first_delay_days` die erste Verlängerungszeit 程序启动后，根据 `first_delay_days` 配置计算首次延期时间 calculate first delay
+2. **Vérification périodique 定期检查**: Toutes les heures, vérifiez si tous les comptes doivent être prolongés 每小时检查一次所有账号是否需要延期 check hourly
+3. **Vérification de la prolongation 延期验证**: Nach erfolgreicher Einreichung der Verlängerung wird automatisch überprüft，ob die Verlängerung erfolgreich war 延期提交后 5 小时自动验证是否成功 verify after 5 hours
+4. **Benachrichtigung bei Fehler 失败通知**: Bei Fehler wird eine E-Mail-Benachrichtigung gesendet 验证失败时发送邮件通知 send email notification
+5. **Sécurité concurrentielle 并发安全**: Bei gleichzeitiger Verlängerung mehrerer Konten wird ein Sperrmechanismus verwendet，um die Sicherheit zu gewährleisten 多账号同时延期时使用锁机制确保安全 lock mechanism
 
-## Structure du répertoire 目录结构
+## Structure du répertoire 目录结构 Directory Structure
 
 ```
 abeiyun/
@@ -225,9 +224,9 @@ abeiyun/
 └── requirements.txt
 ```
 
-## Remarques 注意事项
+## Remarques 注意事项 Notes Important
 
-1. Les fichiers de capture d'écran doivent être préparés à l'avance，contenant les captures d'écran de publication requises pour la demande de prolongation 截图文件需要提前准备好，包含延期申请所需的发帖截图
-2. La notification par e-mail utilise le protocole SMTP，QQ Mail nécessite l'utilisation d'un code d'autorisation au lieu d'un mot de passe 邮件通知使用 SMTP 协议，QQ 邮箱需要使用授权码而非密码
-3. Il est recommandé de définir `first_delay_days` à 4 jours pour s'assurer que la première prolongation est terminée avant l'expiration du serveur 建议设置 `first_delay_days` 为 4 天，确保首次延期在服务器到期前完成
-4. L'intervalle de prolongation est recommandé d'être défini à 5 jours，correspondant au cycle de prolongation du fournisseur de services cloud 延期间隔建议设置为 5 天，与云服务商的延期周期匹配
+1. Les fichiers de capture d'écran doivent être préparés à l'avance，contenant les captures d'écran de publication requises pour la demande de prolongation 截图文件需要提前准备好，包含延期申请所需的发帖截图 screenshots required
+2. La notification par e-mail utilise le protocole SMTP，QQ Mail nécessite l'utilisation d'un code d'autorisation au lieu d'un mot de passe 邮件通知使用 SMTP 协议，QQ 邮箱需要使用授权码而非密码 auth code required
+3. Il est recommandé de définir `first_delay_days` à 4 jours pour s'assurer que la première prolongation est terminée avant l'expiration du serveur 建议设置 `first_delay_days` 为 4 天，确保首次延期在服务器到期前完成 recommended 4 days
+4. L'intervalle de prolongation est recommandé d'être défini à 5 jours，correspondant au cycle de prolongation du fournisseur de services cloud 延期间隔建议设置为 5 天，与云服务商的延期周期匹配 recommended 5 days interval
