@@ -147,13 +147,38 @@ class AccountStateManager:
         except Exception as e:
             logger.error(f'保存账号状态失败: {e}')
     
+    def _get_or_create_state(self, platform: str, username: str) -> AccountDelayState:
+        """
+        获取或创建账号状态（内部方法，不返回副本）
+        
+        实现说明:
+        1. 该方法必须在持有 _file_lock 的情况下调用
+        2. 返回内部状态的引用，用于直接修改
+        3. 外部调用者应使用 get_state() 获取副本
+        
+        Args:
+            platform: 平台
+            username: 用户名
+            
+        Returns:
+            账号状态对象（内部引用）
+        """
+        key = self._get_state_key(platform, username)
+        if key not in self._states:
+            self._states[key] = AccountDelayState()
+        return self._states[key]
+    
     def get_state(self, platform: str, username: str) -> AccountDelayState:
-        """获取账号状态"""
+        """
+        获取账号状态（返回副本，避免调用者直接修改内部状态）
+        
+        实现说明:
+        1. 返回状态的深拷贝，防止并发访问时的数据竞争
+        2. 调用者可以安全地修改返回的状态对象
+        """
         with self._file_lock:
-            key = self._get_state_key(platform, username)
-            if key not in self._states:
-                self._states[key] = AccountDelayState()
-            return self._states[key]
+            state = self._get_or_create_state(platform, username)
+            return AccountDelayState(state.to_dict())
     
     def _calculate_retry_delay(self, consecutive_failures: int) -> timedelta:
         """
@@ -191,11 +216,7 @@ class AccountStateManager:
             delay_interval_days: 延期间隔天数
         """
         with self._file_lock:
-            key = self._get_state_key(platform, username)
-            # 直接访问 _states，避免递归获取锁
-            if key not in self._states:
-                self._states[key] = AccountDelayState()
-            state = self._states[key]
+            state = self._get_or_create_state(platform, username)
             
             state.last_delay_time = datetime.now()
             state.last_success = success
@@ -215,7 +236,7 @@ class AccountStateManager:
             
             self._save_states()
             
-            logger.info(f'记录账号状态: [{platform}] {username}, 成功={success}, 连续失败={state.consecutive_failures}, 下次延期={state.next_delay_time}')
+            logger.info(f'记录账号状态：[{platform}] {username}, 成功={success}, 连续失败={state.consecutive_failures}, 下次延期={state.next_delay_time}')
     
     def record_aggressive_mode_delay(
         self,
@@ -237,11 +258,7 @@ class AccountStateManager:
             aggressive_interval_hours: 高频尝试间隔小时数
         """
         with self._file_lock:
-            key = self._get_state_key(platform, username)
-            # 直接访问 _states，避免递归获取锁
-            if key not in self._states:
-                self._states[key] = AccountDelayState()
-            state = self._states[key]
+            state = self._get_or_create_state(platform, username)
             
             state.last_delay_time = datetime.now()
             state.last_success = True  # 在高频模式下，"还未到时间"视为正常情况
@@ -251,7 +268,7 @@ class AccountStateManager:
             
             self._save_states()
             
-            logger.info(f'记录高频模式状态: [{platform}] {username}, 下次尝试={state.next_delay_time}')
+            logger.info(f'记录高频模式状态：[{platform}] {username}, 下次尝试={state.next_delay_time}')
     
     def start_learning_mode(
         self,
@@ -276,10 +293,7 @@ class AccountStateManager:
             是否成功启动学习模式
         """
         with self._file_lock:
-            key = self._get_state_key(platform, username)
-            if key not in self._states:
-                self._states[key] = AccountDelayState()
-            state = self._states[key]
+            state = self._get_or_create_state(platform, username)
             
             # 如果已经在学习中或已学习，不重复启动
             if state.learning_status == LearningModeStatus.LEARNING:
@@ -325,10 +339,7 @@ class AccountStateManager:
             是否已完成学习（找到最佳时间点）
         """
         with self._file_lock:
-            key = self._get_state_key(platform, username)
-            if key not in self._states:
-                self._states[key] = AccountDelayState()
-            state = self._states[key]
+            state = self._get_or_create_state(platform, username)
             
             # 检查是否在学习中
             if state.learning_status != LearningModeStatus.LEARNING:
@@ -369,7 +380,7 @@ class AccountStateManager:
                 
                 self._save_states()
                 
-                logger.debug(f'【学习模式】继续: [{platform}] {username} 还未到时间，下次尝试={state.next_delay_time}')
+                logger.info(f'【学习模式】继续：[{platform}] {username} 还未到时间，下次尝试={state.next_delay_time}')
                 return False
     
     def is_in_learning_mode(self, platform: str, username: str) -> bool:
@@ -441,16 +452,12 @@ class AccountStateManager:
             first_delay_days: 首次延期天数（从现在开始计算）
         """
         with self._file_lock:
-            key = self._get_state_key(platform, username)
-            # 直接访问 _states，避免递归获取锁
-            if key not in self._states:
-                self._states[key] = AccountDelayState()
-            state = self._states[key]
+            state = self._get_or_create_state(platform, username)
             
             if state.next_delay_time is None:
                 state.next_delay_time = datetime.now() + timedelta(days=first_delay_days)
                 self._save_states()
-                logger.info(f'设置初始延期时间: [{platform}] {username}, 首次延期={first_delay_days}天后')
+                logger.info(f'设置初始延期时间：[{platform}] {username}, 首次延期={first_delay_days}天后')
     
     def should_delay(self, platform: str, username: str) -> bool:
         """
@@ -537,9 +544,8 @@ class AccountStateManager:
         """重置连续失败计数"""
         with self._file_lock:
             key = self._get_state_key(platform, username)
-            state = self.get_state(platform, username)
+            state = self._get_or_create_state(platform, username)
             state.consecutive_failures = 0
-            self._states[key] = state
             self._save_states()
     
     def clear_old_states(self, days: int = 30):

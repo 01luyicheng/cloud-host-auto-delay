@@ -119,13 +119,14 @@ class DelayScheduler:
         
         logger.info('验证任务已配置: 每10分钟检查一次')
     
-    def _check_missed_tasks(self):
+    def _log_missed_tasks(self):
         """
-        检查错过的延期任务（启动时调用）
+        记录错过的延期任务日志（启动时调用）
         
         实现说明:
         1. 检查是否有 next_delay_time 已过期的账号
-        2. 记录日志并立即执行
+        2. 记录日志用于告警
+        3. 注意：该方法仅记录日志，不执行实际任务
         """
         missed = account_state_manager.get_missed_accounts()
         
@@ -143,7 +144,7 @@ class DelayScheduler:
                 f'连续失败 {acc["consecutive_failures"]} 次'
             )
         
-        logger.info('将立即执行这些错过的延期任务')
+        logger.info('这些错过的任务将在下次定时任务检查时自动执行')
     
     def _check_and_run_delay_tasks(self):
         """
@@ -708,7 +709,7 @@ class DelayScheduler:
     
     def start(self):
         """启动调度器"""
-        self._check_missed_tasks()
+        self._log_missed_tasks()
         
         self.scheduler.start()
         logger.info('定时任务调度器已启动')

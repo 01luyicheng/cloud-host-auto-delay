@@ -71,11 +71,17 @@ class AccountConfig:
         if self.first_delay_days < 0:
             return False, '首次延期天数不能为负数'
         if self.delay_interval_days < 1:
-            return False, '延期间隔天数必须大于0'
+            return False, '延期间隔天数必须大于 0'
+        if self.delay_interval_days > 365:
+            return False, '延期间隔天数不能超过 365 天'
         if self.aggressive_interval_hours < 1:
-            return False, '高频尝试间隔小时数必须大于0'
+            return False, '高频尝试间隔小时数必须大于 0'
+        if self.aggressive_interval_hours > 168:
+            return False, '高频尝试间隔小时数不能超过 168 小时（7 天）'
         if self.learning_interval_hours < 1:
-            return False, '学习模式间隔小时数必须大于0'
+            return False, '学习模式间隔小时数必须大于 0'
+        if self.learning_interval_hours > 168:
+            return False, '学习模式间隔小时数不能超过 168 小时（7 天）'
         # 智能学习模式和高频模式不能同时启用
         if self.enable_smart_learning and self.enable_aggressive_mode:
             return False, '智能学习模式和高频尝试模式不能同时启用'
@@ -203,7 +209,14 @@ class Config:
         return [acc for acc in self.accounts if acc.enabled]
     
     def reload(self):
-        """重新加载配置"""
+        """
+        重新加载配置
+        
+        实现说明:
+        1. 重置 _initialized 标志以允许完全重新初始化
+        2. 重新加载所有配置项
+        """
+        self._initialized = False
         self._load_config()
 
 
