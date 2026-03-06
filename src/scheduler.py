@@ -246,6 +246,7 @@ class DelayScheduler:
                         success=success,
                         message=message,
                         learning_interval_hours=account.learning_interval_hours,
+                        delay_interval_days=account.delay_interval_days,
                     )
                     if learned:
                         logger.info(f'【学习模式】账号 [{account.platform}] {account.username} 已完成学习，找到最佳提交时间')
@@ -310,6 +311,14 @@ class DelayScheduler:
             # 学习模式下异常不视为失败，继续学习
             if account.enable_smart_learning and account_state_manager.is_in_learning_mode(account.platform, account.username):
                 logger.info(f'【学习模式】账号 [{account.platform}] {account.username} 学习过程中发生异常，将继续尝试')
+                account_state_manager.record_learning_attempt(
+                    platform=account.platform,
+                    username=account.username,
+                    success=False,
+                    message=f'异常: {str(e)}',
+                    learning_interval_hours=account.learning_interval_hours,
+                    delay_interval_days=account.delay_interval_days,
+                )
                 return
             
             account_state_manager.record_delay(
@@ -346,7 +355,7 @@ class DelayScheduler:
             'too early',
         ]
         message_lower = message.lower()
-        return any(keyword in message for keyword in not_yet_time_keywords)
+        return any(keyword.lower() in message_lower for keyword in not_yet_time_keywords)
     
     def _process_single_account(self, account: AccountConfig) -> Tuple[bool, str]:
         """

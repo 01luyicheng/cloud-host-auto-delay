@@ -82,10 +82,12 @@ class DelayStateManager:
                 self._state = {}
     
     def _save_state(self):
-        """保存状态文件"""
+        """保存状态文件（原子写入）"""
         try:
-            with open(self.state_file, 'w', encoding='utf-8') as f:
+            temp_file = self.state_file.with_suffix('.tmp')
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(self._state, f, ensure_ascii=False, indent=2)
+            temp_file.replace(self.state_file)  # 原子操作
         except Exception as e:
             logger.error(f'保存延期状态失败: {e}')
     

@@ -92,8 +92,8 @@ class AccountStateManager:
     _instance = None
     _lock = threading.Lock()
     
-    MAX_RETRY_HOURS = 24
     MAX_CONSECUTIVE_FAILURES = 10
+    LEARNING_TIMEOUT_DAYS = 7
     
     def __new__(cls):
         if cls._instance is None:
@@ -109,7 +109,7 @@ class AccountStateManager:
         
         self._initialized = True
         self._states: Dict[str, AccountDelayState] = {}
-        self._file_lock = threading.Lock()
+        self._file_lock = threading.RLock()  # 使用可重入锁避免死锁
         
         self.state_file = Path(__file__).parent.parent / 'data' / 'account_state.json'
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
@@ -137,12 +137,13 @@ class AccountStateManager:
             logger.error(f'加载账号状态失败: {e}')
     
     def _save_states(self):
-        """保存状态文件"""
+        """保存状态文件（原子写入）"""
         try:
             data = {key: state.to_dict() for key, state in self._states.items()}
-            
-            with open(self.state_file, 'w', encoding='utf-8') as f:
+            temp_file = self.state_file.with_suffix('.tmp')
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
+            temp_file.replace(self.state_file)  # 原子操作
         except Exception as e:
             logger.error(f'保存账号状态失败: {e}')
     
@@ -302,6 +303,7 @@ class AccountStateManager:
         success: bool,
         message: str,
         learning_interval_hours: int = 2,
+        delay_interval_days: int = 5,
     ) -> bool:
         """
         记录学习模式的尝试结果
@@ -317,6 +319,7 @@ class AccountStateManager:
             success: 是否成功
             message: 结果消息
             learning_interval_hours: 学习间隔小时数
+            delay_interval_days: 延期间隔天数
             
         Returns:
             是否已完成学习（找到最佳时间点）
@@ -335,13 +338,13 @@ class AccountStateManager:
             state.last_delay_time = now
             state.last_message = message
             
-            # 检查学习是否超时（7天）
+            # 检查学习是否超时（使用精确时间比较）
             if state.learning_start_time:
                 learning_duration = now - state.learning_start_time
-                if learning_duration.days >= 7:
-                    logger.warning(f'【学习模式】超时: [{platform}] {username} 学习超过7天仍未找到最佳时间，放弃学习')
+                if learning_duration.total_seconds() >= self.LEARNING_TIMEOUT_DAYS * 24 * 3600:
+                    logger.warning(f'【学习模式】超时: [{platform}] {username} 学习超过{self.LEARNING_TIMEOUT_DAYS}天仍未找到最佳时间，放弃学习')
                     state.learning_status = LearningModeStatus.NOT_STARTED
-                    state.next_delay_time = None  # 让配置的时间生效
+                    state.next_delay_time = now + timedelta(days=delay_interval_days)  # 使用默认配置
                     self._save_states()
                     return False
             
@@ -352,6 +355,8 @@ class AccountStateManager:
                 state.last_success = True
                 state.delay_count += 1
                 state.consecutive_failures = 0
+                # 设置下次延期时间
+                state.next_delay_time = now + timedelta(days=delay_interval_days)
                 
                 self._save_states()
                 
@@ -408,13 +413,13 @@ class AccountStateManager:
         if state.learning_status != LearningModeStatus.LEARNED or not state.learned_delay_time:
             return None
         
-        # 基于学习到的最佳时间，每隔delay_interval_days天
         learned_time = state.learned_delay_time
         now = datetime.now()
         
-        # 计算从学习时间到现在经过了多少个周期
-        days_since_learned = (now - learned_time).days
-        cycles_passed = days_since_learned // delay_interval_days
+        # 使用精确时间计算（total_seconds）而不是只取天数
+        seconds_since_learned = (now - learned_time).total_seconds()
+        days_since_learned = seconds_since_learned / (24 * 3600)
+        cycles_passed = int(days_since_learned // delay_interval_days)
         
         # 下次延期时间 = 学习时间 + (周期数+1) * 间隔
         next_delay = learned_time + timedelta(days=(cycles_passed + 1) * delay_interval_days)
