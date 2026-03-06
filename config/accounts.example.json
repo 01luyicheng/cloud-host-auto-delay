@@ -5,7 +5,9 @@
     "first_delay_days": 4,
     "delay_interval_days": 5,
     "enable_aggressive_mode": false,
-    "aggressive_interval_hours": 6
+    "aggressive_interval_hours": 6,
+    "enable_smart_learning": true,
+    "learning_interval_hours": 2
   },
   "accounts": [
     {
@@ -18,7 +20,9 @@
       "first_delay_days": 4,
       "delay_interval_days": 5,
       "enable_aggressive_mode": false,
-      "aggressive_interval_hours": 6
+      "aggressive_interval_hours": 6,
+      "enable_smart_learning": true,
+      "learning_interval_hours": 2
     },
     {
       "username": "手机号2",
@@ -29,8 +33,10 @@
       "enabled": true,
       "first_delay_days": 4,
       "delay_interval_days": 5,
-      "enable_aggressive_mode": true,
-      "aggressive_interval_hours": 8
+      "enable_aggressive_mode": false,
+      "aggressive_interval_hours": 6,
+      "enable_smart_learning": true,
+      "learning_interval_hours": 2
     }
   ]
 }

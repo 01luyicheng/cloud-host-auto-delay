@@ -34,7 +34,7 @@ from src.logger import logger
 from src.cloud_client import create_client
 from src.notifier import create_notifier_from_config
 from src.delay_state import state_manager, DelayStatus
-from src.account_state import account_state_manager
+from src.account_state import account_state_manager, LearningModeStatus
 
 
 class DelayScheduler:
@@ -74,20 +74,29 @@ class DelayScheduler:
     
     def _init_account_delay_times(self):
         """
-        初始化账号的首次延期时间
+        初始化账号的延期时间
         
         实现说明:
-        1. 对于新账号，设置首次延期时间
-        2. 首次延期时间为 first_delay_days 天后
+        1. 如果启用智能学习模式，启动学习模式
+        2. 否则使用配置的首次延期时间
         """
         accounts = config.get_enabled_accounts()
         
         for account in accounts:
-            account_state_manager.set_initial_next_delay_time(
-                platform=account.platform,
-                username=account.username,
-                first_delay_days=account.first_delay_days,
-            )
+            # 如果启用智能学习模式，启动学习
+            if account.enable_smart_learning:
+                account_state_manager.start_learning_mode(
+                    platform=account.platform,
+                    username=account.username,
+                    learning_interval_hours=account.learning_interval_hours,
+                )
+            else:
+                # 传统模式：设置首次延期时间
+                account_state_manager.set_initial_next_delay_time(
+                    platform=account.platform,
+                    username=account.username,
+                    first_delay_days=account.first_delay_days,
+                )
     
     def _setup_verification_job(self):
         """
@@ -142,7 +151,7 @@ class DelayScheduler:
         
         实现说明:
         1. 获取所有启用的账号
-        2. 检查每个账号是否应该执行延期（普通模式或高频模式）
+        2. 检查每个账号是否应该执行延期（学习模式/高频模式/普通模式）
         3. 对需要延期的账号执行延期操作
         4. 使用锁确保并发安全
         """
@@ -159,8 +168,30 @@ class DelayScheduler:
             if account_state_manager.is_max_retries_exceeded(account.platform, account.username):
                 continue
             
+            # 智能学习模式：高频尝试直到找到最佳时间
+            if account.enable_smart_learning:
+                if account_state_manager.is_in_learning_mode(account.platform, account.username):
+                    if account_state_manager.should_delay(account.platform, account.username):
+                        accounts_to_delay.append(account)
+                        logger.debug(f'账号 [{account.platform}] {account.username} 处于学习模式')
+                elif account_state_manager.has_learned(account.platform, account.username):
+                    # 已学习，检查是否到了基于学习时间的下次延期
+                    next_delay = account_state_manager.calculate_next_delay_from_learned_time(
+                        account.platform, account.username, account.delay_interval_days
+                    )
+                    if next_delay and datetime.now() >= next_delay:
+                        accounts_to_delay.append(account)
+                        logger.debug(f'账号 [{account.platform}] {account.username} 基于学习时间需要延期')
+                else:
+                    # 未开始且未学习，启动学习模式
+                    account_state_manager.start_learning_mode(
+                        platform=account.platform,
+                        username=account.username,
+                        learning_interval_hours=account.learning_interval_hours,
+                    )
+                    accounts_to_delay.append(account)
             # 高频尝试模式：直接尝试，不需要检查时间
-            if account.enable_aggressive_mode:
+            elif account.enable_aggressive_mode:
                 accounts_to_delay.append(account)
                 logger.debug(f'账号 [{account.platform}] {account.username} 启用高频尝试模式')
             elif account_state_manager.should_delay(account.platform, account.username):
@@ -205,6 +236,39 @@ class DelayScheduler:
         try:
             success, message = self._process_single_account(account)
             
+            # 智能学习模式处理
+            if account.enable_smart_learning:
+                if account_state_manager.is_in_learning_mode(account.platform, account.username):
+                    # 学习中：记录学习结果
+                    learned = account_state_manager.record_learning_attempt(
+                        platform=account.platform,
+                        username=account.username,
+                        success=success,
+                        message=message,
+                        learning_interval_hours=account.learning_interval_hours,
+                    )
+                    if learned:
+                        logger.info(f'【学习模式】账号 [{account.platform}] {account.username} 已完成学习，找到最佳提交时间')
+                        # 发送学习完成通知
+                        self._send_learning_completed_notification(account)
+                    elif not success and self._is_not_yet_time_message(message):
+                        logger.info(f'【学习模式】账号 [{account.platform}] {account.username} 还未到可延期时间，继续学习')
+                    return
+                elif account_state_manager.has_learned(account.platform, account.username):
+                    # 已学习：按固定周期记录
+                    account_state_manager.record_delay(
+                        platform=account.platform,
+                        username=account.username,
+                        success=success,
+                        message=message,
+                        delay_interval_days=account.delay_interval_days,
+                    )
+                    if success:
+                        logger.info(f'账号 {account.username} 延期申请成功（基于学习时间）')
+                    else:
+                        logger.error(f'账号 {account.username} 延期申请失败: {message}')
+                    return
+            
             # 高频尝试模式：如果失败是因为"还未到时间"，则视为正常情况
             if not success and account.enable_aggressive_mode:
                 if self._is_not_yet_time_message(message):
@@ -242,6 +306,11 @@ class DelayScheduler:
             
         except Exception as e:
             logger.error(f'处理账号 {account.username} 时发生异常: {e}')
+            
+            # 学习模式下异常不视为失败，继续学习
+            if account.enable_smart_learning and account_state_manager.is_in_learning_mode(account.platform, account.username):
+                logger.info(f'【学习模式】账号 [{account.platform}] {account.username} 学习过程中发生异常，将继续尝试')
+                return
             
             account_state_manager.record_delay(
                 platform=account.platform,
@@ -345,6 +414,39 @@ class DelayScheduler:
         }
         
         notifier.send_notification('延期任务执行失败', results, summary)
+    
+    def _send_learning_completed_notification(self, account: AccountConfig):
+        """
+        发送学习完成通知
+        
+        实现说明:
+        当智能学习模式找到最佳提交时间时发送通知
+        """
+        learned_time = account_state_manager.get_learned_time(
+            account.platform, account.username
+        )
+        time_str = learned_time.strftime("%Y-%m-%d %H:%M") if learned_time else "未知"
+        
+        logger.info(f'【学习模式】账号 [{account.platform}] {account.username} 学习完成，最佳时间: {time_str}')
+        
+        notifier = create_notifier_from_config()
+        
+        title = '【学习模式】找到最佳延期时间'
+        
+        results = [{
+            'username': account.username,
+            'platform': account.platform,
+            'success': True,
+            'message': f'智能学习完成，最佳提交时间: {time_str}，之后将每隔 {account.delay_interval_days} 天自动提交',
+        }]
+        
+        summary = {
+            'total': 1,
+            'success': 1,
+            'fail': 0,
+        }
+        
+        notifier.send_notification(title, results, summary)
     
     def _send_consecutive_failure_warning(self, account: AccountConfig, failures: int, message: str):
         """

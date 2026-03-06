@@ -25,6 +25,13 @@ from typing import Dict, Any, Optional, List
 from src.logger import logger
 
 
+class LearningModeStatus:
+    """学习模式状态枚举"""
+    NOT_STARTED = 'not_started'    # 未开始（首次运行）
+    LEARNING = 'learning'          # 学习中（高频尝试找时间点）
+    LEARNED = 'learned'            # 已学习（找到规律，进入固定周期）
+
+
 class AccountDelayState:
     """单个账号的延期状态"""
     
@@ -48,6 +55,21 @@ class AccountDelayState:
         self.last_message: str = data.get('last_message', '')
         self.delay_count: int = data.get('delay_count', 0)
         self.consecutive_failures: int = data.get('consecutive_failures', 0)
+        
+        # 学习模式相关字段
+        self.learning_status: str = data.get('learning_status', LearningModeStatus.NOT_STARTED)
+        self.learned_delay_time: Optional[datetime] = None  # 学习到的最佳提交时间
+        if data.get('learned_delay_time'):
+            try:
+                self.learned_delay_time = datetime.fromisoformat(data['learned_delay_time'])
+            except (ValueError, TypeError):
+                self.learned_delay_time = None
+        self.learning_start_time: Optional[datetime] = None  # 学习开始时间
+        if data.get('learning_start_time'):
+            try:
+                self.learning_start_time = datetime.fromisoformat(data['learning_start_time'])
+            except (ValueError, TypeError):
+                self.learning_start_time = None
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -58,6 +80,9 @@ class AccountDelayState:
             'last_message': self.last_message,
             'delay_count': self.delay_count,
             'consecutive_failures': self.consecutive_failures,
+            'learning_status': self.learning_status,
+            'learned_delay_time': self.learned_delay_time.isoformat() if self.learned_delay_time else None,
+            'learning_start_time': self.learning_start_time.isoformat() if self.learning_start_time else None,
         }
 
 
@@ -226,6 +251,175 @@ class AccountStateManager:
             self._save_states()
             
             logger.info(f'记录高频模式状态: [{platform}] {username}, 下次尝试={state.next_delay_time}')
+    
+    def start_learning_mode(
+        self,
+        platform: str,
+        username: str,
+        learning_interval_hours: int = 2,
+    ) -> bool:
+        """
+        启动学习模式
+        
+        实现说明:
+        1. 首次运行时自动进入学习模式
+        2. 高频尝试提交，找到"刚开始允许提交"的时间点
+        3. 学习模式最长持续7天
+        
+        Args:
+            platform: 平台
+            username: 用户名
+            learning_interval_hours: 学习阶段尝试间隔（默认2小时）
+            
+        Returns:
+            是否成功启动学习模式
+        """
+        with self._file_lock:
+            key = self._get_state_key(platform, username)
+            if key not in self._states:
+                self._states[key] = AccountDelayState()
+            state = self._states[key]
+            
+            # 如果已经在学习中或已学习，不重复启动
+            if state.learning_status == LearningModeStatus.LEARNING:
+                return False
+            if state.learning_status == LearningModeStatus.LEARNED:
+                return False
+            
+            state.learning_status = LearningModeStatus.LEARNING
+            state.learning_start_time = datetime.now()
+            state.next_delay_time = datetime.now()  # 立即开始第一次尝试
+            
+            self._save_states()
+            
+            logger.info(f'【学习模式】启动: [{platform}] {username}，将高频尝试找到最佳提交时间')
+            return True
+    
+    def record_learning_attempt(
+        self,
+        platform: str,
+        username: str,
+        success: bool,
+        message: str,
+        learning_interval_hours: int = 2,
+    ) -> bool:
+        """
+        记录学习模式的尝试结果
+        
+        实现说明:
+        1. 如果提交成功，说明找到了最佳时间点，进入已学习状态
+        2. 如果提交失败（还未到时间），继续学习，按间隔重试
+        3. 学习超过7天仍未成功，则放弃学习，按配置的时间提交
+        
+        Args:
+            platform: 平台
+            username: 用户名
+            success: 是否成功
+            message: 结果消息
+            learning_interval_hours: 学习间隔小时数
+            
+        Returns:
+            是否已完成学习（找到最佳时间点）
+        """
+        with self._file_lock:
+            key = self._get_state_key(platform, username)
+            if key not in self._states:
+                self._states[key] = AccountDelayState()
+            state = self._states[key]
+            
+            # 检查是否在学习中
+            if state.learning_status != LearningModeStatus.LEARNING:
+                return False
+            
+            now = datetime.now()
+            state.last_delay_time = now
+            state.last_message = message
+            
+            # 检查学习是否超时（7天）
+            if state.learning_start_time:
+                learning_duration = now - state.learning_start_time
+                if learning_duration.days >= 7:
+                    logger.warning(f'【学习模式】超时: [{platform}] {username} 学习超过7天仍未找到最佳时间，放弃学习')
+                    state.learning_status = LearningModeStatus.NOT_STARTED
+                    state.next_delay_time = None  # 让配置的时间生效
+                    self._save_states()
+                    return False
+            
+            if success:
+                # 找到了！记录这个时间点
+                state.learning_status = LearningModeStatus.LEARNED
+                state.learned_delay_time = now
+                state.last_success = True
+                state.delay_count += 1
+                state.consecutive_failures = 0
+                
+                self._save_states()
+                
+                logger.info(f'【学习模式】完成: [{platform}] {username} 找到最佳提交时间: {now.strftime("%Y-%m-%d %H:%M")}')
+                return True
+            else:
+                # 还未到时间，继续学习
+                state.last_success = False
+                state.next_delay_time = now + timedelta(hours=learning_interval_hours)
+                
+                self._save_states()
+                
+                logger.debug(f'【学习模式】继续: [{platform}] {username} 还未到时间，下次尝试={state.next_delay_time}')
+                return False
+    
+    def is_in_learning_mode(self, platform: str, username: str) -> bool:
+        """检查账号是否处于学习模式"""
+        state = self.get_state(platform, username)
+        return state.learning_status == LearningModeStatus.LEARNING
+    
+    def has_learned(self, platform: str, username: str) -> bool:
+        """检查账号是否已完成学习"""
+        state = self.get_state(platform, username)
+        return state.learning_status == LearningModeStatus.LEARNED
+    
+    def get_learned_time(self, platform: str, username: str) -> Optional[datetime]:
+        """获取学习到的最佳提交时间"""
+        state = self.get_state(platform, username)
+        return state.learned_delay_time
+    
+    def calculate_next_delay_from_learned_time(
+        self,
+        platform: str,
+        username: str,
+        delay_interval_days: int,
+    ) -> Optional[datetime]:
+        """
+        根据学习到的最佳时间计算下次延期时间
+        
+        实现说明:
+        1. 如果已完成学习，根据学习到的最佳时间 + 固定周期计算
+        2. 保持每天的时间点一致（例如每天14:30）
+        
+        Args:
+            platform: 平台
+            username: 用户名
+            delay_interval_days: 延期间隔天数
+            
+        Returns:
+            下次延期时间，如果未学习则返回None
+        """
+        state = self.get_state(platform, username)
+        
+        if state.learning_status != LearningModeStatus.LEARNED or not state.learned_delay_time:
+            return None
+        
+        # 基于学习到的最佳时间，每隔delay_interval_days天
+        learned_time = state.learned_delay_time
+        now = datetime.now()
+        
+        # 计算从学习时间到现在经过了多少个周期
+        days_since_learned = (now - learned_time).days
+        cycles_passed = days_since_learned // delay_interval_days
+        
+        # 下次延期时间 = 学习时间 + (周期数+1) * 间隔
+        next_delay = learned_time + timedelta(days=(cycles_passed + 1) * delay_interval_days)
+        
+        return next_delay
     
     def set_initial_next_delay_time(
         self,

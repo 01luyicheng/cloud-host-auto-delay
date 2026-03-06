@@ -47,6 +47,10 @@ class AccountConfig:
         # 高频尝试模式配置
         self.enable_aggressive_mode: bool = data.get('enable_aggressive_mode', False)
         self.aggressive_interval_hours: int = data.get('aggressive_interval_hours', 6)
+        
+        # 智能学习模式配置
+        self.enable_smart_learning: bool = data.get('enable_smart_learning', False)
+        self.learning_interval_hours: int = data.get('learning_interval_hours', 2)
     
     def validate(self) -> Tuple[bool, str]:
         """验证账号配置是否完整"""
@@ -70,6 +74,11 @@ class AccountConfig:
             return False, '延期间隔天数必须大于0'
         if self.aggressive_interval_hours < 1:
             return False, '高频尝试间隔小时数必须大于0'
+        if self.learning_interval_hours < 1:
+            return False, '学习模式间隔小时数必须大于0'
+        # 智能学习模式和高频模式不能同时启用
+        if self.enable_smart_learning and self.enable_aggressive_mode:
+            return False, '智能学习模式和高频尝试模式不能同时启用'
         return True, ''
 
 
@@ -165,6 +174,8 @@ class Config:
                 'delay_interval_days': account_data.get('delay_interval_days', global_config.get('delay_interval_days', 5)),
                 'enable_aggressive_mode': account_data.get('enable_aggressive_mode', global_config.get('enable_aggressive_mode', False)),
                 'aggressive_interval_hours': account_data.get('aggressive_interval_hours', global_config.get('aggressive_interval_hours', 6)),
+                'enable_smart_learning': account_data.get('enable_smart_learning', global_config.get('enable_smart_learning', False)),
+                'learning_interval_hours': account_data.get('learning_interval_hours', global_config.get('learning_interval_hours', 2)),
             }
                 merged_data.update(account_data)
                 
