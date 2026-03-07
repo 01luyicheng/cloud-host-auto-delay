@@ -1,19 +1,19 @@
-# 云主机 Gratuit Serveur Auto-Delay 程序 Cloud Server
+# 云主机 Auto-Delay 程序 Cloud Server
 
-Автоматически einreichen 阿贝云 und 三丰云 kostenlose Serververlängerung automatic.
+Automatisch 提交 阿贝云 und 三丰云 kostenlose Verlängerung automatic.
 
-## Fonctionnalités 功能特性 Features
+## 功能 Features Fonctionnalités
 
-- Unterstützt 阿贝云，三丰云多平台 multi-platform
-- Prise en charge de la gestion multi-comptes 多账号管理 multiple accounts
-- Konfiguration auf Kontenebene 延期间隔配置 interval configuration
-- Verlängerungsfehlerüberprüfung und E-Mail-Benachrichtigung 延期失败自动验证和邮件通知
-- Limitation quotidienne des envois d'e-mails 每日邮件发送限制 daily limit
-- Prise en charge du service systemd systemd 服务支持 support
+- Unterstützt 阿贝云，三丰云 multi-platform 多平台
+- Gestion multi-comptes 多账号管理 multiple accounts
+- Konfiguration 延期间隔配置 interval config
+- Fehlerüberprüfung und 邮件通知 email notification
+- 每日 daily limitation 邮件发送限制
+- systemd 服务支持 service support
 
-## Démarrage rapide 快速开始 Quick Start
+## Quick 开始 Démarrage
 
-### 1. Installation des dépendances 安装依赖 Install Dependencies
+### 1. 安装 Install Installation Dependencies 依赖
 
 ```bash
 python -m venv venv
@@ -22,16 +22,16 @@ source venv/bin/activate  # Linux
 pip install -r requirements.txt
 ```
 
-### 2. Configuration 配置 Configurar
+### 2. 配置 Config Configurar
 
-Copier le fichier de configuration template 复制配置文件模板 copy template：
+复制 Copy kopieren 配置 template 模板：
 
 ```bash
 cp .env.example .env
 cp config/accounts.example.json config/accounts.json
 ```
 
-Modifier la configuration de notification par e-mail `.env` (optional 可选)：
+编辑 Edit bearbeiten 邮件配置 notification config：
 
 ```ini
 SMTP_HOST=smtp.qq.com
@@ -42,7 +42,7 @@ NOTIFICATION_EMAIL=receive@example.com
 MAX_DAILY_EMAILS=10
 ```
 
-Modifier la configuration des comptes `config/accounts.json` 配置账号 configure accounts：
+配置 Configure konfigurieren 账号 accounts：
 
 ```json
 {
@@ -65,140 +65,141 @@ Modifier la configuration des comptes `config/accounts.json` 配置账号 config
 }
 ```
 
-### 3. Préparation des captures d'écran 准备截图 Prepare Screenshots
+### 3. 准备 Prepare Préparation 截图 Screenshots
 
-Placer les captures d'écran requises dans le répertoire du projet 将延期申请所需的截图放到项目目录下，nom de fichier correspondant à `screenshot_path` dans la configuration 文件名与配置中的 `screenshot_path` 对应 corresponding to config.
+放置 Placer 截图 screenshots 到项目 project 目录 répertoire，文件名 nom de fichier 对应 correspondant 配置 config 中的 `screenshot_path`。
 
-### 4. Exécution 运行 Execute
+### 4. 运行 Run Exécution Execute
 
 ```bash
-# Tester la configuration 测试配置 test config
+# 测试 Test tester config 配置
 python main.py --test
 
-# Vérifier l'état 查看状态 check status
+# 查看 Check vérifier 状态 état status
 python main.py --status
 
-# Exécuter une fois immédiatement 立即执行一次 execute once
+# 立即 Execute once 执行一次
 python main.py --once
 
-# Démarrer la tâche planifiée 启动定时任务 start scheduler
+# 启动 Start démarrer 定时任务 scheduler
 python main.py
 ```
 
-## Explication de la configuration 配置说明 Configuration Explanation
+## 配置 Config Explanation 说明
 
-### Configuration des comptes 账号配置 Account Config (config/accounts.json)
+### 账号 Accounts 配置 Config (config/accounts.json)
 
-| Champ 字段 | Description 说明 | Valeur par défaut 默认值 Default |
+| 字段 Champ Field | 说明 Description Beschreibung | 默认值 Default |
 |------|------|--------|
-| username | Nom d'utilisateur de connexion (numéro de téléphone) 登录用户名（手机号） | Requis 必填 |
-| password | Mot de passe de connexion 登录密码 | Requis 必填 |
-| platform | Plateforme: abeiyun oder sanfengyun 平台：abeiyun 或 sanfengyun | abeiyun |
-| post_url | URL de publication 发帖地址 | Requis 必填 |
-| screenshot_path | Chemin de capture d'écran 截图路径 | Requis 必填 |
-| ptype | Type de produit: vps oder vhost 产品类型：vps 或 vhost | vps |
-| enabled | Activer 是否启用 | true |
-| first_delay_days | Premier délai en jours (à partir de maintenant) 首次延期天数（从现在开始） | 0 |
-| delay_interval_days | Intervalle de délai en jours 延期间隔天数 | 5 |
+| username | 登录 login 用户名 nom (手机号 téléphone) | 必填 Required |
+| password | 登录 login 密码 mot de passe | 必填 Required |
+| platform | 平台 Plateforme: abeiyun oder sanfengyun | abeiyun |
+| post_url | 发帖 URL publication | 必填 Required |
+| screenshot_path | 截图 Chemin screenshot | 必填 Required |
+| ptype | 产品 Type produit: vps oder vhost | vps |
+| enabled | 启用 Activer enable | true |
+| first_delay_days | 首次 Premier first délai 天数 jours | 0 |
+| delay_interval_days | 延期 Intervalle interval 天数 jours | 5 |
 
-### Variables d'environnement 环境变量 Environment Variables (.env)
+### 环境 Environment 变量 Variables (.env)
 
-| Variable 变量 | Description 说明 | Défaut 默认值 |
+| 变量 Variable | 说明 Description | 默认值 Default |
 |------|------|--------|
-| SMTP_HOST | Adresse du serveur SMTP SMTP 服务器地址 | - |
-| SMTP_PORT | Port SMTP SMTP 端口 | 587 |
-| SMTP_USER | Nom d'utilisateur SMTP SMTP 用户名 | - |
-| SMTP_PASSWORD | Mot de passe SMTP / Code d'autorisation SMTP 密码/授权码 | - |
-| NOTIFICATION_EMAIL | Boîte aux lettres de notification 接收通知的邮箱 | - |
-| WEBHOOK_URL | Adresse Webhook (WeChat Enterprise, etc.) Webhook 地址（企业微信等） | - |
-| LOG_LEVEL | Niveau de journal 日志级别 | INFO |
-| VERIFICATION_DELAY_HOURS | Heures de délai de vérification de prolongation 延期验证延迟小时数 | 5 |
-| MAX_DAILY_EMAILS | Nombre maximum d'e-mails quotidiens 每日最大邮件数 | 10 |
+| SMTP_HOST | SMTP 服务器 serveur address | - |
+| SMTP_PORT | SMTP 端口 port | 587 |
+| SMTP_USER | SMTP 用户名 user | - |
+| SMTP_PASSWORD | SMTP 密码 password/code | - |
+| NOTIFICATION_EMAIL | 通知 notification 邮箱 email | - |
+| WEBHOOK_URL | Webhook 地址 address (企业微信等) | - |
+| LOG_LEVEL | 日志 journal level | INFO |
+| VERIFICATION_DELAY_HOURS | 延期验证 vérification delay 小时数 | 5 |
+| MAX_DAILY_EMAILS | 每日 daily 最大 max 邮件数 | 10 |
 
-## Déploiement Linux Linux 部署 Deployment
+## Linux 部署 Deploy Déploiement
 
-### Méthode 1: Installation rapide en un clic 方式一：一键快速安装（推荐）
+### 方式一 Method 1: 一键快速安装 Quick Install
 
-Exécutez directement la commande suivante sur le serveur Linux 在 Linux 服务器上直接执行以下命令 execute command：
+在 Linux 服务器 server 上执行 execute 以下 commande 命令：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/01luyicheng/cloud-host-auto-delay/main/deploy/quick-install.sh | sudo bash
 ```
 
-Nach der Installation, bearbeiten Sie die Konfigurationsdatei 安装完成后，编辑配置文件 edit config：
+安装 Install 完成后，编辑 edit 配置 config：
 
 ```bash
-# Éditer la configuration de l'environnement 编辑环境配置
+# 编辑 Edit 环境 environment 配置
 nano /opt/abeiyun/.env
 
-# Éditer la configuration des comptes 编辑账号配置
+# 编辑 Edit 账号 accounts 配置
 nano /opt/abeiyun/config/accounts.json
 
-# Téléverser les fichiers de capture vers /opt/abeiyun/ 上传截图文件到 /opt/abeiyun/
-# Redémarrer le service 重启服务 restart service
+# 上传 Upload 截图 screenshots 到 /opt/abeiyun/
+
+# 重启 Restart 服务 service
 systemctl restart abeiyun
 ```
 
-### Méthode 2: Déploiement manuel 方式二：手动部署 Manual Deploy
+### 方式二 Method 2: 手动 Manual 部署 Deploy
 
 ```bash
-# Téléverser le projet vers le serveur 上传项目到服务器 upload project
+# 上传 Upload 项目 project 到服务器 server
 scp -r abeiyun user@server:/tmp/
 
-# Se connecter au serveur via SSH SSH 登录服务器
+# SSH 登录 Connexion 服务器 server
 ssh user@server
 
-# Exécuter le script de déploiement 运行部署脚本
+# 运行 Run 部署 deploy 脚本 script
 cd /tmp/abeiyun
 sudo bash deploy/deploy.sh
 ```
 
-### Verwaltung des Services 服务管理 Service Management
+### 服务 Service 管理 Gestion Management
 
 ```bash
-# Démarrer le service 启动服务
+# 启动 Start 服务
 systemctl start abeiyun
 
-# Arrêter le service 停止服务
+# 停止 Stop 服务
 systemctl stop abeiyun
 
-# Redémarrer le service 重启服务
+# 重启 Restart 服务
 systemctl restart abeiyun
 
-# Vérifier l'état 查看状态
+# 查看 Check 状态 status
 systemctl status abeiyun
 
-# Voir les journaux 查看日志
+# 查看 Voir 日志 logs
 journalctl -u abeiyun -f
 ```
 
-### Mise à jour du programme 更新程序 Update Program
+### 更新 Update 程序 Program
 
 ```bash
-# Téléverser la nouvelle version 上传新版本
+# 上传 Upload 新版本 version
 scp -r abeiyun user@server:/tmp/
 
-# Exécuter le script de mise à jour 运行更新脚本
+# 运行 Run 更新 update 脚本 script
 cd /tmp/abeiyun
 sudo bash deploy/update.sh
 ```
 
-## Explication du mécanisme de prolongation 延期机制说明 Mechanism
+## 延期 Delay 机制 Mécanisme 说明
 
-1. **Premier délai 首次延期**: Nach dem Start des Programms berechnet die Konfiguration `first_delay_days` die erste Verlängerungszeit 程序启动后，根据 `first_delay_days` 配置计算首次延期时间 calculate first delay
-2. **Vérification périodique 定期检查**: Toutes les heures, vérifiez si tous les comptes doivent être prolongés 每小时检查一次所有账号是否需要延期 check hourly
-3. **Vérification de la prolongation 延期验证**: Nach erfolgreicher Einreichung der Verlängerung wird automatisch überprüft，ob die Verlängerung erfolgreich war 延期提交后 5 小时自动验证是否成功 verify after 5 hours
-4. **Benachrichtigung bei Fehler 失败通知**: Bei Fehler wird eine E-Mail-Benachrichtigung gesendet 验证失败时发送邮件通知 send email notification
-5. **Sécurité concurrentielle 并发安全**: Bei gleichzeitiger Verlängerung mehrerer Konten wird ein Sperrmechanismus verwendet，um die Sicherheit zu gewährleisten 多账号同时延期时使用锁机制确保安全 lock mechanism
+1. **首次 Premier 延期**: 程序 program 启动后，根据 config 配置 `first_delay_days` 计算 calculate 首次 first 延期时间
+2. **定期 Périodique 检查**: 每小时 hourly 检查 check 所有账号 accounts 是否需要延期
+3. **延期 Vérification 验证**: 提交后 5 小时 automatically 验证 verify 是否成功
+4. **失败 Error 通知**: 验证失败时发送 send 邮件 notification
+5. **并发 Concurrentiel 安全**: 多账号同时延期时使用 lock 锁机制确保安全
 
-## Structure du répertoire 目录结构 Directory Structure
+## 目录 Directory 结构 Structure
 
 ```
 abeiyun/
 ├── config/
 │   ├── accounts.example.json
-│   └── accounts.json       # Konfiguration réelle (nicht eingereicht) 实际配置（不提交）
-├── data/                   # Laufzeitdaten (nicht eingereicht) 运行时数据（不提交）
+│   └── accounts.json       # 实际 config (不提交)
+├── data/                   # 运行时 data (不提交)
 │   ├── account_state.json
 │   ├── delay_state.json
 │   └── email_rate.json
@@ -206,7 +207,7 @@ abeiyun/
 │   ├── abeiun.service
 │   ├── deploy.sh
 │   └── update.sh
-├── logs/                   # Protokolldateien (nicht eingereicht) 日志文件（不提交）
+├── logs/                   # 日志 logs (不提交)
 ├── src/
 │   ├── __init__.py
 │   ├── account_state.py
@@ -216,7 +217,7 @@ abeiyun/
 │   ├── logger.py
 │   ├── notifier.py
 │   └── scheduler.py
-├── .env                    # Umgebungsvariablen (nicht eingereicht) 环境变量（不提交）
+├── .env                    # 环境 variables (不提交)
 ├── .env.example
 ├── .gitignore
 ├── main.py
@@ -224,9 +225,9 @@ abeiyun/
 └── requirements.txt
 ```
 
-## Remarques 注意事项 Notes Important
+## 注意 Notes 事项
 
-1. Les fichiers de capture d'écran doivent être préparés à l'avance，contenant les captures d'écran de publication requises pour la demande de prolongation 截图文件需要提前准备好，包含延期申请所需的发帖截图 screenshots required
-2. La notification par e-mail utilise le protocole SMTP，QQ Mail nécessite l'utilisation d'un code d'autorisation au lieu d'un mot de passe 邮件通知使用 SMTP 协议，QQ 邮箱需要使用授权码而非密码 auth code required
-3. Il est recommandé de définir `first_delay_days` à 4 jours pour s'assurer que la première prolongation est terminée avant l'expiration du serveur 建议设置 `first_delay_days` 为 4 天，确保首次延期在服务器到期前完成 recommended 4 days
-4. L'intervalle de prolongation est recommandé d'être défini à 5 jours，correspondant au cycle de prolongation du fournisseur de services cloud 延期间隔建议设置为 5 天，与云服务商的延期周期匹配 recommended 5 days interval
+1. 截图 screenshots 需要提前 prepare 好，包含 required 发帖 screenshots
+2. 邮件 notification 使用 SMTP 协议，QQ 邮箱需要使用 auth code 而非 password
+3. 建议 config `first_delay_days` 为 4 jours 天，确保首次延期在服务器 expiry 前完成
+4. 延期 interval 建议 config 为 5 jours 天，与云服务商的周期 cycle 匹配
