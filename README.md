@@ -1,5 +1,5 @@
 # 云主机 Auto-Delay 程序 Cloud Server
-
+这是一些比较良心的云服务厂商，所以最好不要使用这个项目
 Automatisch 提交 阿贝云 und 三丰云 kostenlose Verlängerung automatic.
 
 ## 功能 Features Fonctionnalités
