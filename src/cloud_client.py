@@ -111,14 +111,15 @@ class CloudHostClient(ABC):
         log_lines.append(f'  方法: {method}')
         log_lines.append(f'  URL: {url}')
 
+        sensitive_keys = {
+            'password', 'passwd', 'token', 'secret',
+            'api_key', 'apikey', 'authorization', 'auth',
+            'credential', 'private_key', 'access_token', 'refresh_token',
+        }
+
         def _mask_sensitive(payload: Any, seen_ids=None) -> Any:
             if seen_ids is None:
                 seen_ids = set()
-            sensitive_keys = {
-                'password', 'passwd', 'token', 'secret',
-                'api_key', 'apikey', 'authorization', 'auth',
-                'credential', 'private_key', 'access_token', 'refresh_token',
-            }
 
             if isinstance(payload, dict):
                 payload_id = id(payload)
