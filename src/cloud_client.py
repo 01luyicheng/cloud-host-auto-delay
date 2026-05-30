@@ -125,26 +125,35 @@ class CloudHostClient(ABC):
                 if payload_id in seen_ids:
                     return '<circular_ref>'
                 seen_ids.add(payload_id)
-                return {
-                    key: (
-                        '***'
-                        if str(key).lower() in sensitive_keys
-                        else _mask_sensitive(value, seen_ids)
-                    )
-                    for key, value in payload.items()
-                }
+                try:
+                    return {
+                        key: (
+                            '***'
+                            if str(key).lower() in sensitive_keys
+                            else _mask_sensitive(value, seen_ids)
+                        )
+                        for key, value in payload.items()
+                    }
+                finally:
+                    seen_ids.remove(payload_id)
             if isinstance(payload, list):
                 payload_id = id(payload)
                 if payload_id in seen_ids:
                     return '<circular_ref>'
                 seen_ids.add(payload_id)
-                return [_mask_sensitive(item, seen_ids) for item in payload]
+                try:
+                    return [_mask_sensitive(item, seen_ids) for item in payload]
+                finally:
+                    seen_ids.remove(payload_id)
             if isinstance(payload, tuple):
                 payload_id = id(payload)
                 if payload_id in seen_ids:
                     return '<circular_ref>'
                 seen_ids.add(payload_id)
-                return tuple(_mask_sensitive(item, seen_ids) for item in payload)
+                try:
+                    return tuple(_mask_sensitive(item, seen_ids) for item in payload)
+                finally:
+                    seen_ids.remove(payload_id)
             return payload
         
         if params:
